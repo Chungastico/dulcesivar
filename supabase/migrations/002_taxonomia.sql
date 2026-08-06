@@ -18,6 +18,22 @@
 -- compartible tal cual:  /catalogo?ocasion=bodas&tipo-caja=morning-box
 -- ============================================================================
 
+-- ---------------------------------------------------------------------------
+-- Guarda: esta migración se apoya en las tablas de schema.sql.
+-- Si te aparece el error de abajo, casi siempre significa que el SQL Editor
+-- está abierto en OTRO proyecto de Supabase. Verifica arriba a la izquierda
+-- que sea el proyecto correcto (el mismo de NEXT_PUBLIC_SUPABASE_URL).
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if to_regclass('public.products') is null then
+    raise exception
+      'Falta la tabla public.products. Ejecuta primero supabase/schema.sql, y confirma que estás en el proyecto correcto.';
+  end if;
+end
+$$;
+
+
 create table if not exists public.attribute_groups (
   id          uuid primary key default gen_random_uuid(),
   slug        text not null unique,

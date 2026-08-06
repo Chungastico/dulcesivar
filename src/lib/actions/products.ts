@@ -38,11 +38,14 @@ const productSchema = z.object({
       "El slug solo admite minúsculas, números y guiones",
     ),
   description: z.string().trim().max(5000).nullable(),
-  // El input vacío llega como "", que debe guardarse como NULL, no como 0.
-  price_usd: z
-    .union([z.coerce.number().min(0).max(99999), z.literal("")])
-    .transform((v) => (v === "" ? null : v))
-    .nullable(),
+  // Obligatorio: el precio es uno de los filtros del catálogo, y un producto
+  // sin precio quedaría invisible en cualquier búsqueda por presupuesto.
+  // La columna sigue aceptando NULL en la base a propósito, para poder añadir
+  // un "a cotizar" más adelante sin migrar.
+  price_usd: z.coerce
+    .number({ message: "El precio es obligatorio" })
+    .min(0, "El precio no puede ser negativo")
+    .max(99999),
   is_active: z.boolean(),
   is_featured: z.boolean(),
   valueIds: z.array(z.string().uuid()),

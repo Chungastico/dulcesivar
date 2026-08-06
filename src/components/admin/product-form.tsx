@@ -5,6 +5,7 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { ActionState } from "@/lib/actions/products";
+import { parseContentList } from "@/lib/parse-contents";
 import { slugify } from "@/lib/slug";
 import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 
@@ -103,13 +104,14 @@ export function ProductForm({
       <Field
         label="Precio (USD)"
         error={state.fieldErrors?.price_usd}
-        hint="Opcional. Déjalo vacío si prefieres cotizar por WhatsApp."
+        hint="Obligatorio: es uno de los filtros del catálogo."
       >
         <input
           name="price_usd"
           type="number"
           step="0.01"
           min="0"
+          required
           defaultValue={initial.price_usd}
           placeholder="25.00"
           className={inputClass}
@@ -207,6 +209,9 @@ function ContentsEditor({
   contents: { label: string; quantity: number }[];
   onChange: (next: { label: string; quantity: number }[]) => void;
 }) {
+  const [pasting, setPasting] = useState(false);
+  const [draft, setDraft] = useState("");
+
   const update = (i: number, patch: Partial<{ label: string; quantity: number }>) =>
     onChange(contents.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
@@ -252,13 +257,66 @@ function ContentsEditor({
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onChange([...contents, { label: "", quantity: 1 }])}
-        className="self-start rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-muted transition hover:border-brand-teal hover:text-brand-green"
-      >
-        + Agregar ítem
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onChange([...contents, { label: "", quantity: 1 }])}
+          className="rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-muted transition hover:border-brand-teal hover:text-brand-green"
+        >
+          + Agregar ítem
+        </button>
+        <button
+          type="button"
+          onClick={() => setPasting((v) => !v)}
+          className="rounded-lg border border-dashed border-brand-teal px-3 py-2 text-sm font-medium text-brand-green transition hover:bg-brand-teal/10"
+        >
+          {pasting ? "Cerrar" : "Pegar lista completa"}
+        </button>
+      </div>
+
+      {pasting ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-brand-teal/40 bg-brand-teal/5 p-3">
+          <p className="text-xs text-ink-muted">
+            Pega aquí la lista tal como la tienes (una línea por ítem). Las
+            viñetas se quitan solas y los números del inicio se toman como
+            cantidad: <code>2 libras uva verde</code> queda como 2 ×{" "}
+            <em>libras uva verde</em>.
+          </p>
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={6}
+            placeholder={"• 1 Vaso Transparente personalizado\n• 12 rosas\n• 3 chocolates Ferrero"}
+            className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={!draft.trim()}
+              onClick={() => {
+                onChange([...contents, ...parseContentList(draft)]);
+                setDraft("");
+                setPasting(false);
+              }}
+              className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
+            >
+              Agregar {parseContentList(draft).length || ""} ítems
+            </button>
+            <button
+              type="button"
+              disabled={!draft.trim()}
+              onClick={() => {
+                onChange(parseContentList(draft));
+                setDraft("");
+                setPasting(false);
+              }}
+              className="rounded-lg border border-line bg-surface-raised px-3 py-1.5 text-sm text-ink-muted transition hover:bg-brand-cream/40 disabled:opacity-40"
+            >
+              Reemplazar todo
+            </button>
+          </div>
+        </div>
+      ) : null}
     </fieldset>
   );
 }
