@@ -25,10 +25,14 @@ export default async function AdminDashboardPage() {
   ]);
 
   const stats = [
-    { label: "Productos", value: products.count ?? 0 },
-    { label: "Publicados", value: activeProducts.count ?? 0 },
-    { label: "Líneas de regalo", value: lines.count ?? 0 },
-    { label: "Imágenes", value: images.count ?? 0 },
+    { label: "Productos", value: products.count ?? 0, accent: "bg-brand-green" },
+    {
+      label: "Publicados",
+      value: activeProducts.count ?? 0,
+      accent: "bg-brand-teal",
+    },
+    { label: "Líneas de regalo", value: lines.count ?? 0, accent: "bg-brand-lime" },
+    { label: "Imágenes", value: images.count ?? 0, accent: "bg-brand-orange" },
   ];
 
   const failed = [products, activeProducts, lines, images].find((r) => r.error);
@@ -36,27 +40,31 @@ export default async function AdminDashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="text-2xl font-semibold text-neutral-900">Panel</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="text-2xl font-semibold text-brand-green">Panel</h1>
+        <p className="mt-1 text-sm text-ink-muted">
           Resumen del catálogo de Dulces Sivar.
         </p>
       </div>
 
       {failed?.error ? (
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <p className="rounded-lg border border-brand-orange/40 bg-brand-orange/10 px-4 py-3 text-sm text-ink">
           No se pudo leer la base de datos: {failed.error.message}. ¿Ya
           ejecutaste <code>supabase/schema.sql</code> en el SQL Editor de
           Supabase?
         </p>
       ) : (
-        <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {stats.map((s) => (
             <div
               key={s.label}
-              className="rounded-lg border border-neutral-200 bg-white px-4 py-4"
+              className="relative overflow-hidden rounded-xl border border-line bg-surface-raised px-4 py-4"
             >
-              <dt className="text-sm text-neutral-500">{s.label}</dt>
-              <dd className="mt-1 text-2xl font-semibold text-neutral-900">
+              <span
+                aria-hidden
+                className={`absolute inset-x-0 top-0 h-1 ${s.accent}`}
+              />
+              <dt className="text-sm text-ink-muted">{s.label}</dt>
+              <dd className="mt-1 text-3xl font-semibold text-brand-green">
                 {s.value}
               </dd>
             </div>
@@ -66,14 +74,20 @@ export default async function AdminDashboardPage() {
 
       <div className="flex flex-wrap gap-3">
         <Link
+          href="/admin/productos/nuevo"
+          className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-95"
+        >
+          + Nuevo producto
+        </Link>
+        <Link
           href="/admin/productos"
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700"
+          className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
           Gestionar productos
         </Link>
         <Link
           href="/admin/lineas"
-          className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-brand-green transition hover:bg-brand-cream/40"
         >
           Gestionar líneas
         </Link>

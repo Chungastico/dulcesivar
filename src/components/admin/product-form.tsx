@@ -56,7 +56,7 @@ export function ProductForm({
   return (
     <form action={formAction} className="flex flex-col gap-6">
       {state.error ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {state.error}
         </p>
       ) : null}
@@ -121,17 +121,17 @@ export function ProductForm({
       <input type="hidden" name="contents" value={JSON.stringify(contents)} />
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-neutral-900">
+        <legend className="text-sm font-medium text-brand-green">
           Líneas de regalo
         </legend>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-ink-muted">
           Un producto puede estar en varias. Define en qué filtros aparece.
         </p>
         <div className="mt-1 grid gap-2 sm:grid-cols-2">
           {lines.map((line) => (
             <label
               key={line.id}
-              className="flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm"
+              className="flex items-center gap-2 rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink has-checked:border-brand-teal has-checked:bg-brand-teal/10"
             >
               <input
                 type="checkbox"
@@ -155,12 +155,12 @@ export function ProductForm({
           name="images"
           multiple
           accept="image/jpeg,image/png,image/webp,image/avif"
-          className="block w-full text-sm text-neutral-600 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-neutral-700"
+          className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-green file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
         />
       </Field>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-sm text-neutral-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="is_active"
@@ -169,7 +169,7 @@ export function ProductForm({
           />
           Publicado (visible en el catálogo)
         </label>
-        <label className="flex items-center gap-2 text-sm text-neutral-700">
+        <label className="flex items-center gap-2 text-sm text-ink">
           <input
             type="checkbox"
             name="is_featured"
@@ -180,11 +180,11 @@ export function ProductForm({
         </label>
       </div>
 
-      <div className="flex items-center gap-3 border-t border-neutral-200 pt-6">
+      <div className="flex items-center gap-3 border-t border-line pt-6">
         <SubmitButton label={submitLabel} />
         <Link
           href="/admin/productos"
-          className="rounded-md border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          className="rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-cream/40"
         >
           Cancelar
         </Link>
@@ -205,10 +205,10 @@ function ContentsEditor({
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium text-neutral-900">
+      <legend className="text-sm font-medium text-brand-green">
         ¿Qué incluye?
       </legend>
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-ink-muted">
         Los ítems que componen el regalo. Se mostrarán como lista en la ficha.
       </p>
 
@@ -223,7 +223,7 @@ function ContentsEditor({
               onChange={(e) =>
                 update(i, { quantity: Number(e.target.value) || 1 })
               }
-              className="w-20 rounded-md border border-neutral-300 px-3 py-2 text-sm"
+              className="w-20 rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink"
               aria-label={`Cantidad del ítem ${i + 1}`}
             />
             <input
@@ -236,7 +236,7 @@ function ContentsEditor({
             <button
               type="button"
               onClick={() => onChange(contents.filter((_, idx) => idx !== i))}
-              className="rounded-md px-2 py-2 text-sm text-neutral-500 hover:bg-neutral-100 hover:text-red-600"
+              className="rounded-lg px-2 py-2 text-sm text-ink-muted transition hover:bg-red-50 hover:text-red-700"
               aria-label={`Quitar ítem ${i + 1}`}
             >
               Quitar
@@ -248,7 +248,7 @@ function ContentsEditor({
       <button
         type="button"
         onClick={() => onChange([...contents, { label: "", quantity: 1 }])}
-        className="self-start rounded-md border border-dashed border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:border-neutral-400 hover:text-neutral-900"
+        className="self-start rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-muted transition hover:border-brand-teal hover:text-brand-green"
       >
         + Agregar ítem
       </button>
@@ -257,7 +257,7 @@ function ContentsEditor({
 }
 
 const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none";
+  "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30";
 
 function Field({
   label,
@@ -272,12 +272,12 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-neutral-900">{label}</span>
+      <span className="text-sm font-medium text-brand-green">{label}</span>
       {children}
       {error ? (
-        <span className="text-xs text-red-600">{error}</span>
+        <span className="text-xs text-red-700">{error}</span>
       ) : hint ? (
-        <span className="text-xs text-neutral-500">{hint}</span>
+        <span className="text-xs text-ink-muted">{hint}</span>
       ) : null}
     </label>
   );
@@ -289,7 +289,7 @@ function SubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+      className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? "Guardando…" : label}
     </button>

@@ -22,7 +22,7 @@ export function ProductImages({
 
   if (!images.length) {
     return (
-      <p className="rounded-lg border border-dashed border-neutral-300 px-4 py-8 text-center text-sm text-neutral-500">
+      <p className="rounded-xl border border-dashed border-line bg-surface-raised px-4 py-8 text-center text-sm text-ink-muted">
         Este producto aún no tiene imágenes. Agrégalas con el campo de abajo.
       </p>
     );
@@ -35,9 +35,9 @@ export function ProductImages({
       {images.map((image) => (
         <li
           key={image.id}
-          className="overflow-hidden rounded-lg border border-neutral-200 bg-white"
+          className="overflow-hidden rounded-xl border border-line bg-surface-raised"
         >
-          <div className="relative aspect-square bg-neutral-100">
+          <div className="relative aspect-square bg-brand-cream/50">
             <Image
               src={`${publicUrlBase}/${image.storage_path}`}
               alt={image.alt_text ?? ""}
@@ -46,7 +46,7 @@ export function ProductImages({
               className="object-cover"
             />
             {image.is_cover ? (
-              <span className="absolute left-2 top-2 rounded bg-neutral-900/80 px-1.5 py-0.5 text-xs font-medium text-white">
+              <span className="absolute left-2 top-2 rounded bg-brand-green/90 px-1.5 py-0.5 text-xs font-medium text-white">
                 Portada
               </span>
             ) : null}
@@ -54,7 +54,7 @@ export function ProductImages({
 
           <div className="flex items-center justify-between gap-2 px-2 py-1.5">
             {image.is_cover ? (
-              <span className="text-xs text-neutral-400">Principal</span>
+              <span className="text-xs text-ink-muted">Principal</span>
             ) : (
               <button
                 type="button"
@@ -62,7 +62,7 @@ export function ProductImages({
                 onClick={() =>
                   startTransition(() => void setCoverImage(image.id))
                 }
-                className="text-xs text-neutral-600 hover:text-neutral-900 disabled:opacity-50"
+                className="text-xs text-ink-muted transition hover:text-brand-green disabled:opacity-50"
               >
                 Hacer portada
               </button>
@@ -73,7 +73,7 @@ export function ProductImages({
               onClick={() =>
                 startTransition(() => void deleteProductImage(image.id))
               }
-              className="text-xs text-neutral-500 hover:text-red-600 disabled:opacity-50"
+              className="text-xs text-ink-muted transition hover:text-red-700 disabled:opacity-50"
             >
               Borrar
             </button>

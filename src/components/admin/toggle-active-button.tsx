@@ -24,8 +24,8 @@ export function ToggleActiveButton({
       title={isActive ? "Quitar del catálogo" : "Publicar en el catálogo"}
       className={`rounded px-2 py-1 text-xs font-medium transition disabled:opacity-50 ${
         isActive
-          ? "bg-green-100 text-green-700 hover:bg-green-200"
-          : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+          ? "bg-brand-teal/20 text-brand-green hover:bg-brand-teal/30"
+          : "bg-brand-cream text-ink-muted hover:brightness-95"
       }`}
     >
       {isActive ? "Publicado" : "Borrador"}
