@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 export default async function NewProductPage() {
   await requireAdmin();
 
-  const { data: lines } = await supabaseAdmin()
-    .from("product_lines")
-    .select("id, name")
+  const { data: groups } = await supabaseAdmin()
+    .from("attribute_groups")
+    .select("*, attribute_values(*)")
     .eq("is_active", true)
     .order("sort_order");
 
@@ -24,17 +24,17 @@ export default async function NewProductPage() {
     <div className="flex max-w-2xl flex-col gap-6">
       <div>
         <Link
-          href="/admin/productos"
+          href="/admin/catalogo"
           className="text-sm text-neutral-500 hover:text-neutral-900"
         >
-          ← Productos
+          ← Catálogo
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-neutral-900">
           Nuevo producto
         </h1>
       </div>
 
-      <ProductForm action={createProduct} lines={lines ?? []} />
+      <ProductForm action={createProduct} groups={groups ?? []} />
     </div>
   );
 }

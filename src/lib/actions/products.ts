@@ -45,7 +45,7 @@ const productSchema = z.object({
     .nullable(),
   is_active: z.boolean(),
   is_featured: z.boolean(),
-  lineIds: z.array(z.string().uuid()),
+  valueIds: z.array(z.string().uuid()),
   contents: z.array(contentItemSchema).max(50),
 });
 
@@ -71,7 +71,7 @@ function parseProductForm(formData: FormData) {
     price_usd: String(formData.get("price_usd") ?? "").trim(),
     is_active: formData.get("is_active") === "on",
     is_featured: formData.get("is_featured") === "on",
-    lineIds: formData.getAll("lineIds").map(String),
+    valueIds: formData.getAll("valueIds").map(String),
     contents,
   });
 }
@@ -138,13 +138,13 @@ async function saveRelations(
     if (error) return `No se pudo guardar el contenido: ${error.message}`;
   }
 
-  // Líneas: igual, se reescriben.
-  await db.from("product_line_map").delete().eq("product_id", productId);
-  if (data.lineIds.length) {
+  // Clasificación: igual, se reescribe entera.
+  await db.from("product_attributes").delete().eq("product_id", productId);
+  if (data.valueIds.length) {
     const { error } = await db
-      .from("product_line_map")
-      .insert(data.lineIds.map((line_id) => ({ product_id: productId, line_id })));
-    if (error) return `No se pudieron guardar las líneas: ${error.message}`;
+      .from("product_attributes")
+      .insert(data.valueIds.map((value_id) => ({ product_id: productId, value_id })));
+    if (error) return `No se pudo guardar la clasificación: ${error.message}`;
   }
 
   if (files.length) {
@@ -218,9 +218,9 @@ export async function createProduct(
     return { error: relationError };
   }
 
-  revalidatePath("/admin/productos");
+  revalidatePath("/admin/catalogo");
   revalidatePath("/catalogo");
-  redirect("/admin/productos");
+  redirect("/admin/catalogo");
 }
 
 export async function updateProduct(
@@ -254,10 +254,10 @@ export async function updateProduct(
   const relationError = await saveRelations(db, productId, parsed.data, files);
   if (relationError) return { error: relationError };
 
-  revalidatePath("/admin/productos");
-  revalidatePath(`/admin/productos/${productId}`);
+  revalidatePath("/admin/catalogo");
+  revalidatePath(`/admin/catalogo/${productId}`);
   revalidatePath("/catalogo");
-  redirect("/admin/productos");
+  redirect("/admin/catalogo");
 }
 
 export async function deleteProduct(productId: string) {
@@ -278,9 +278,9 @@ export async function deleteProduct(productId: string) {
   const { error } = await db.from("products").delete().eq("id", productId);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/productos");
+  revalidatePath("/admin/catalogo");
   revalidatePath("/catalogo");
-  redirect("/admin/productos");
+  redirect("/admin/catalogo");
 }
 
 export async function deleteProductImage(imageId: string) {
@@ -314,7 +314,7 @@ export async function deleteProductImage(imageId: string) {
     }
   }
 
-  revalidatePath(`/admin/productos/${image.product_id}`);
+  revalidatePath(`/admin/catalogo/${image.product_id}`);
   revalidatePath("/catalogo");
 }
 
@@ -339,7 +339,7 @@ export async function setCoverImage(imageId: string) {
 
   await db.from("product_images").update({ is_cover: true }).eq("id", imageId);
 
-  revalidatePath(`/admin/productos/${image.product_id}`);
+  revalidatePath(`/admin/catalogo/${image.product_id}`);
   revalidatePath("/catalogo");
 }
 
@@ -354,6 +354,6 @@ export async function toggleProductActive(productId: string, isActive: boolean) 
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/admin/productos");
+  revalidatePath("/admin/catalogo");
   revalidatePath("/catalogo");
 }

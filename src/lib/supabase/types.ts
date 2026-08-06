@@ -10,12 +10,28 @@
  * consulta pierde el tipado sin dar un error claro.
  */
 
-/** Línea de regalo: bodas, aniversario, San Valentín, etc. */
-export type ProductLine = {
+/**
+ * Un eje de clasificación: "Ocasión", "Tipo de caja", "Destinatario"...
+ * El slug es el nombre del parámetro en la URL del catálogo.
+ */
+export type AttributeGroup = {
   id: string;
   slug: string;
   name: string;
   description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  show_in_filters: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Un valor dentro de un eje: "Bodas" dentro de "Ocasión". */
+export type AttributeValue = {
+  id: string;
+  group_id: string;
+  slug: string;
+  name: string;
   sort_order: number;
   is_active: boolean;
   created_at: string;
@@ -53,9 +69,9 @@ export type ProductImage = {
   created_at: string;
 };
 
-export type ProductLineMap = {
+export type ProductAttribute = {
   product_id: string;
-  line_id: string;
+  value_id: string;
 };
 
 /** Columnas con default en SQL: opcionales al insertar. */
@@ -89,22 +105,34 @@ type ProductFk<Table extends string> = {
 export type Database = {
   public: {
     Tables: {
-      product_lines: Table<ProductLine>;
+      attribute_groups: Table<AttributeGroup>;
+      attribute_values: Table<
+        AttributeValue,
+        [
+          {
+            foreignKeyName: "attribute_values_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "attribute_groups";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
       products: Table<Product>;
       product_contents: Table<
         ProductContent,
         [ProductFk<"product_contents">]
       >;
       product_images: Table<ProductImage, [ProductFk<"product_images">]>;
-      product_line_map: Table<
-        ProductLineMap,
+      product_attributes: Table<
+        ProductAttribute,
         [
-          ProductFk<"product_line_map">,
+          ProductFk<"product_attributes">,
           {
-            foreignKeyName: "product_line_map_line_id_fkey";
-            columns: ["line_id"];
+            foreignKeyName: "product_attributes_value_id_fkey";
+            columns: ["value_id"];
             isOneToOne: false;
-            referencedRelation: "product_lines";
+            referencedRelation: "attribute_values";
             referencedColumns: ["id"];
           },
         ]
@@ -117,9 +145,7 @@ export type Database = {
   };
 };
 
-/** Producto con sus relaciones, tal como lo consume el catálogo. */
-export type ProductWithRelations = Product & {
-  product_images: ProductImage[];
-  product_contents: ProductContent[];
-  product_lines: ProductLine[];
+/** Un eje con sus valores, como lo consumen el panel y los filtros. */
+export type AttributeGroupWithValues = AttributeGroup & {
+  attribute_values: AttributeValue[];
 };

@@ -8,7 +8,7 @@ import { publicEnv } from "@/lib/env";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
-  title: "Productos",
+  title: "Catálogo",
   robots: { index: false, follow: false },
 };
 
@@ -19,7 +19,7 @@ export default async function AdminProductsPage() {
   const { data: products, error } = await db
     .from("products")
     .select(
-      "id, name, slug, price_usd, is_active, created_at, product_images(storage_path, is_cover), product_line_map(line_id)",
+      "id, name, slug, price_usd, is_active, created_at, product_images(storage_path, is_cover), product_attributes(value_id)",
     )
     .order("created_at", { ascending: false });
 
@@ -28,9 +28,9 @@ export default async function AdminProductsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold text-brand-green">Productos</h1>
+        <h1 className="text-2xl font-semibold text-brand-green">Catálogo</h1>
         <Link
-          href="/admin/productos/nuevo"
+          href="/admin/catalogo/nuevo"
           className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-95"
         >
           + Nuevo producto
@@ -64,14 +64,14 @@ export default async function AdminProductsPage() {
 
                 <div className="flex min-w-0 flex-1 flex-col">
                   <Link
-                    href={`/admin/productos/${product.id}`}
+                    href={`/admin/catalogo/${product.id}`}
                     className="truncate text-sm font-medium text-ink hover:text-brand-green hover:underline"
                   >
                     {product.name}
                   </Link>
                   <span className="text-xs text-ink-muted">
-                    {product.product_line_map.length} línea
-                    {product.product_line_map.length === 1 ? "" : "s"}
+                    {product.product_attributes.length} etiqueta
+                    {product.product_attributes.length === 1 ? "" : "s"}
                     {product.product_images.length
                       ? ` · ${product.product_images.length} imagen${product.product_images.length === 1 ? "" : "es"}`
                       : " · sin imágenes"}
@@ -92,9 +92,9 @@ export default async function AdminProductsPage() {
         </ul>
       ) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line bg-surface-raised px-4 py-12 text-center">
-          <p className="text-sm text-ink-muted">Aún no hay productos.</p>
+          <p className="text-sm text-ink-muted">Aún no hay productos en el catálogo.</p>
           <Link
-            href="/admin/productos/nuevo"
+            href="/admin/catalogo/nuevo"
             className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
           >
             Crear el primero

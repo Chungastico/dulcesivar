@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 
 import type { ActionState } from "@/lib/actions/products";
 import { slugify } from "@/lib/slug";
-import type { ProductLine } from "@/lib/supabase/types";
+import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 
 export type ProductFormValues = {
   name: string;
@@ -15,7 +15,7 @@ export type ProductFormValues = {
   price_usd: string;
   is_active: boolean;
   is_featured: boolean;
-  lineIds: string[];
+  valueIds: string[];
   contents: { label: string; quantity: number }[];
 };
 
@@ -26,18 +26,18 @@ const EMPTY: ProductFormValues = {
   price_usd: "",
   is_active: true,
   is_featured: false,
-  lineIds: [],
+  valueIds: [],
   contents: [],
 };
 
 export function ProductForm({
   action,
-  lines,
+  groups,
   initial = EMPTY,
   submitLabel = "Guardar producto",
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
-  lines: Pick<ProductLine, "id" | "name">[];
+  groups: AttributeGroupWithValues[];
   initial?: ProductFormValues;
   submitLabel?: string;
 }) {
@@ -120,31 +120,38 @@ export function ProductForm({
       {/* El editor es dinámico: se serializa a JSON en un campo oculto. */}
       <input type="hidden" name="contents" value={JSON.stringify(contents)} />
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-brand-green">
-          Líneas de regalo
-        </legend>
-        <p className="text-xs text-ink-muted">
-          Un producto puede estar en varias. Define en qué filtros aparece.
-        </p>
-        <div className="mt-1 grid gap-2 sm:grid-cols-2">
-          {lines.map((line) => (
-            <label
-              key={line.id}
-              className="flex items-center gap-2 rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink has-checked:border-brand-teal has-checked:bg-brand-teal/10"
-            >
-              <input
-                type="checkbox"
-                name="lineIds"
-                value={line.id}
-                defaultChecked={initial.lineIds.includes(line.id)}
-                className="size-4"
-              />
-              {line.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {/* Un fieldset por eje. Marcar en varios es lo normal, no la excepción:
+          de ahí sale la potencia de los filtros combinados del catálogo. */}
+      {groups.map((group) => (
+        <fieldset key={group.id} className="flex flex-col gap-2">
+          <legend className="text-sm font-medium text-brand-green">
+            {group.name}
+          </legend>
+          {group.description ? (
+            <p className="text-xs text-ink-muted">{group.description}</p>
+          ) : null}
+          <div className="mt-1 flex flex-wrap gap-2">
+            {group.attribute_values
+              .filter((v) => v.is_active)
+              .sort((a, b) => a.sort_order - b.sort_order)
+              .map((value) => (
+                <label
+                  key={value.id}
+                  className="flex items-center gap-2 rounded-full border border-line bg-surface-raised px-3 py-1.5 text-sm text-ink transition has-checked:border-brand-teal has-checked:bg-brand-teal/10 has-checked:font-medium has-checked:text-brand-green"
+                >
+                  <input
+                    type="checkbox"
+                    name="valueIds"
+                    value={value.id}
+                    defaultChecked={initial.valueIds.includes(value.id)}
+                    className="size-4"
+                  />
+                  {value.name}
+                </label>
+              ))}
+          </div>
+        </fieldset>
+      ))}
 
       <Field
         label="Agregar imágenes"
@@ -183,7 +190,7 @@ export function ProductForm({
       <div className="flex items-center gap-3 border-t border-line pt-6">
         <SubmitButton label={submitLabel} />
         <Link
-          href="/admin/productos"
+          href="/admin/catalogo"
           className="rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-cream/40"
         >
           Cancelar

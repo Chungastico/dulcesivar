@@ -20,7 +20,7 @@ export default async function AdminDashboardPage() {
       .from("products")
       .select("*", { count: "exact", head: true })
       .eq("is_active", true),
-    db.from("product_lines").select("*", { count: "exact", head: true }),
+    db.from("attribute_values").select("*", { count: "exact", head: true }),
     db.from("product_images").select("*", { count: "exact", head: true }),
   ]);
 
@@ -31,7 +31,7 @@ export default async function AdminDashboardPage() {
       value: activeProducts.count ?? 0,
       accent: "bg-brand-teal",
     },
-    { label: "Líneas de regalo", value: lines.count ?? 0, accent: "bg-brand-lime" },
+    { label: "Categorías", value: lines.count ?? 0, accent: "bg-brand-lime" },
     { label: "Imágenes", value: images.count ?? 0, accent: "bg-brand-orange" },
   ];
 
@@ -74,22 +74,22 @@ export default async function AdminDashboardPage() {
 
       <div className="flex flex-wrap gap-3">
         <Link
-          href="/admin/productos/nuevo"
+          href="/admin/catalogo/nuevo"
           className="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-95"
         >
           + Nuevo producto
         </Link>
         <Link
-          href="/admin/productos"
+          href="/admin/catalogo"
           className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
         >
-          Gestionar productos
+          Gestionar catálogo
         </Link>
         <Link
-          href="/admin/lineas"
+          href="/admin/categorias"
           className="rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-brand-green transition hover:bg-brand-cream/40"
         >
-          Gestionar líneas
+          Gestionar categorías
         </Link>
       </div>
     </div>

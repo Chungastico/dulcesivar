@@ -17,20 +17,20 @@ export const metadata: Metadata = {
 
 export default async function EditProductPage({
   params,
-}: PageProps<"/admin/productos/[id]">) {
+}: PageProps<"/admin/catalogo/[id]">) {
   await requireAdmin();
   const { id } = await params;
 
   const db = supabaseAdmin();
-  const [productResult, linesResult] = await Promise.all([
+  const [productResult, groupsResult] = await Promise.all([
     db
       .from("products")
-      .select("*, product_contents(*), product_images(*), product_line_map(line_id)")
+      .select("*, product_contents(*), product_images(*), product_attributes(value_id)")
       .eq("id", id)
       .maybeSingle(),
     db
-      .from("product_lines")
-      .select("id, name")
+      .from("attribute_groups")
+      .select("*, attribute_values(*)")
       .eq("is_active", true)
       .order("sort_order"),
   ]);
@@ -51,10 +51,10 @@ export default async function EditProductPage({
     <div className="flex max-w-2xl flex-col gap-8">
       <div>
         <Link
-          href="/admin/productos"
+          href="/admin/catalogo"
           className="text-sm text-neutral-500 hover:text-neutral-900"
         >
-          ← Productos
+          ← Catálogo
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-neutral-900">
           {product.name}
@@ -68,7 +68,7 @@ export default async function EditProductPage({
 
       <ProductForm
         action={updateProduct.bind(null, product.id)}
-        lines={linesResult.data ?? []}
+        groups={groupsResult.data ?? []}
         submitLabel="Guardar cambios"
         initial={{
           name: product.name,
@@ -77,7 +77,7 @@ export default async function EditProductPage({
           price_usd: product.price_usd != null ? String(product.price_usd) : "",
           is_active: product.is_active,
           is_featured: product.is_featured,
-          lineIds: product.product_line_map.map((m) => m.line_id),
+          valueIds: product.product_attributes.map((a) => a.value_id),
           contents,
         }}
       />

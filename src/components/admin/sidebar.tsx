@@ -5,15 +5,15 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 type NavItem = {
-  href: "/admin" | "/admin/productos" | "/admin/lineas";
+  href: "/admin" | "/admin/catalogo" | "/admin/categorias";
   label: string;
   icon: React.ReactNode;
 };
 
 const NAV: NavItem[] = [
   { href: "/admin", label: "Panel", icon: <IconHome /> },
-  { href: "/admin/productos", label: "Productos", icon: <IconBox /> },
-  { href: "/admin/lineas", label: "Líneas de regalo", icon: <IconTag /> },
+  { href: "/admin/catalogo", label: "Catálogo", icon: <IconBox /> },
+  { href: "/admin/categorias", label: "Categorías", icon: <IconTag /> },
 ];
 
 export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
