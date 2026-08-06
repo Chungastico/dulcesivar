@@ -1,22 +1,27 @@
 import Link from "next/link";
 import { SignOutButton, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 
 import { getAdminUser } from "@/lib/auth";
 
 /**
- * Shell del panel admin. Aquí se aplica el filtro por correo: el middleware ya
- * garantizó que hay sesión, pero solo el correo de ADMIN_EMAIL entra.
+ * Shell del panel admin y puerta de entrada de todas sus páginas.
+ *
+ * Dos comprobaciones distintas, con respuestas distintas:
+ *   1. Sin sesión -> al login (no es un error, solo falta identificarse).
+ *   2. Con sesión pero otro correo -> acceso denegado (identificarse de nuevo
+ *      no ayuda; hace falta LA cuenta).
  *
  * Vive dentro del route group (protected) a propósito: /admin/sign-in queda
  * fuera de este layout, si no la pantalla de login heredaría este gate y
  * mostraría "acceso denegado" sin dejar iniciar sesión nunca.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const user = await getAdminUser();
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) return redirectToSignIn();
 
-  if (!user) {
-    return <AccessDenied />;
-  }
+  const user = await getAdminUser();
+  if (!user) return <AccessDenied />;
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">

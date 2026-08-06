@@ -1,6 +1,6 @@
 import "server-only";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 
 import { serverEnv } from "@/lib/env";
 
@@ -37,11 +37,22 @@ export async function isAdmin(): Promise<boolean> {
 }
 
 /**
- * Exige sesión de admin. Lanza si no lo es.
- * Úsalo al inicio de cada Server Action y Route Handler que escriba datos:
- * el layout protege las páginas, pero no las acciones.
+ * Exige sesión de admin. Úsalo al inicio de cada página del panel y de cada
+ * Server Action que escriba datos: el layout protege las páginas, pero las
+ * acciones se invocan por su cuenta y nadie más las cubre.
+ *
+ * Distingue los dos casos a propósito:
+ *   - Sin sesión -> redirige al login. No es un error: las páginas del panel se
+ *     renderizan en paralelo con su layout, así que si esto lanzara, cada
+ *     visita anónima ensuciaría los logs con un stack trace.
+ *   - Con sesión pero otro correo -> lanza. Aquí sí es una anomalía: el layout
+ *     ya debería haber mostrado "acceso denegado", y llegar hasta acá significa
+ *     que alguien invocó la acción por fuera de la UI.
  */
 export async function requireAdmin() {
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) redirectToSignIn();
+
   const user = await getAdminUser();
   if (!user) {
     throw new Error("No autorizado: se requiere la cuenta de administrador.");
