@@ -38,14 +38,39 @@ const FALLBACK_MODEL = "mistralai/mistral-small-3.2-24b-instruct";
 const MAX_TOKENS = 600;
 const TIMEOUT_MS = 25_000;
 
+/**
+ * La foto es de un pedido ya entregado, así que trae dos clases de detalle que
+ * no describen el producto de catálogo:
+ *   - la personalización de ESE cliente (un nombre grabado, una dedicatoria);
+ *   - el adorno de ESA entrega (el color del moño, el papel, el lazo).
+ * Ninguno se repite igual en la siguiente unidad. Lo que sí se repite, y es lo
+ * que la clienta necesita leer, son los artículos que van dentro.
+ *
+ * Los ejemplos de abajo no son decorativos: sin ellos el modelo enumera cada
+ * envoltorio y repite "personalizado" en cada artículo.
+ */
 const PROMPT = [
   "Eres quien redacta el catálogo de Dulces Sivar, una tienda salvadoreña de",
-  "regalos armados (cajas de regalo con dulces, flores, globos y artículos",
-  "personalizados).",
-  "Describe la foto en UNA sola oración de venta, en español neutro de El",
-  "Salvador, máximo 25 palabras.",
-  "No inventes precios, marcas ni cantidades que no se vean claramente.",
-  "No empieces con «Esta imagen muestra» ni describas el fondo.",
+  "regalos armados.",
+  "Escribe UNA sola oración de venta en español neutro de El Salvador, de 15 a",
+  "25 palabras, sobre el regalo de la foto.",
+  "",
+  "NOMBRA los artículos principales que van dentro (termo, vaso, taza,",
+  "chocolates, flores, peluche, globo, tarjeta, caja).",
+  "Puedes decir el color de uno o dos artículos principales, nada más.",
+  "",
+  "NO menciones: nombres propios, dedicatorias, fechas ni texto escrito sobre",
+  "nada; colores de moños, lazos, papel o relleno; ni la palabra",
+  "«personalizado» más de una vez en toda la oración.",
+  "",
+  "Ejemplo CORRECTO: «Caja de madera con termo negro, chocolates y tarjeta,",
+  "un detalle elegante para sorprender en cualquier ocasión.»",
+  "Ejemplo INCORRECTO: «Regala termo negro personalizado, termo gris con tapa",
+  "transparente, chocolates envueltos en dorado, tarjeta personalizada y moño",
+  "café.»",
+  "",
+  "No inventes precios, marcas ni cantidades que no se vean con claridad.",
+  "No empieces con «Esta imagen muestra» ni describas el fondo ni la mesa.",
   "Responde únicamente con la oración, sin comillas.",
 ].join(" ");
 

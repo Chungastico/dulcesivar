@@ -77,6 +77,7 @@ export default async function EditProductPage({
         groups={groupsResult.data ?? []}
         presets={presetsResult.data ?? []}
         existingImages={images.length}
+        existingImageUrls={images.map((i) => `${publicUrlBase}/${i.storage_path}`)}
         submitLabel="Guardar cambios"
         initial={{
           name: product.name,

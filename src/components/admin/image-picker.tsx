@@ -1,40 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 /**
- * Selector de fotos con vista previa.
+ * Zona de carga de fotos.
  *
- * Va primero en el formulario porque es lo primero que se tiene a mano al
- * cargar un producto: se saca la foto y desde ahí se escribe todo lo demás
- * (de hecho, la descripción se sugiere a partir de ella).
+ * Solo elige archivos: la vista previa vive en PhotoRail, que queda fija a la
+ * derecha durante todos los pasos. Duplicar las miniaturas aquí solo repetiría
+ * lo que ya se ve al lado.
  */
 export function ImagePicker({
   onFilesChange,
+  selectedCount,
   existingImages = 0,
   error,
 }: {
   onFilesChange: (files: FileList | null) => void;
+  selectedCount: number;
   existingImages?: number;
   error?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [previews, setPreviews] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
-
-  // Las object URLs no se liberan solas; sin esto cada cambio de selección
-  // deja memoria colgada.
-  useEffect(() => {
-    return () => previews.forEach((url) => URL.revokeObjectURL(url));
-  }, [previews]);
-
-  function handleFiles(files: FileList | null) {
-    setPreviews((old) => {
-      old.forEach((url) => URL.revokeObjectURL(url));
-      return files ? Array.from(files).map((f) => URL.createObjectURL(f)) : [];
-    });
-    onFilesChange(files);
-  }
 
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-4">
@@ -45,9 +32,9 @@ export function ImagePicker({
             <span className="text-brand-orange">*</span>
           ) : null}
         </h2>
-        {previews.length > 0 ? (
+        {selectedCount > 0 ? (
           <span className="text-sm text-ink-muted">
-            {previews.length} seleccionada{previews.length === 1 ? "" : "s"}
+            {selectedCount} seleccionada{selectedCount === 1 ? "" : "s"}
           </span>
         ) : null}
       </div>
@@ -63,13 +50,11 @@ export function ImagePicker({
           setDragging(false);
           if (e.dataTransfer.files.length && inputRef.current) {
             inputRef.current.files = e.dataTransfer.files;
-            handleFiles(e.dataTransfer.files);
+            onFilesChange(e.dataTransfer.files);
           }
         }}
-        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition ${
-          dragging
-            ? "border-brand-teal bg-brand-teal/10"
-            : "border-line bg-surface"
+        className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed p-6 text-center transition ${
+          dragging ? "border-brand-teal bg-brand-teal/10" : "border-line bg-surface"
         }`}
       >
         <svg
@@ -104,7 +89,7 @@ export function ImagePicker({
           onClick={() => inputRef.current?.click()}
           className="mt-1 rounded-lg bg-brand-green px-4 py-2 text-base font-medium text-white transition hover:opacity-90"
         >
-          Elegir fotos
+          {selectedCount > 0 ? "Cambiar fotos" : "Elegir fotos"}
         </button>
 
         <input
@@ -113,31 +98,10 @@ export function ImagePicker({
           name="images"
           multiple
           accept="image/jpeg,image/png,image/webp,image/avif"
-          onChange={(e) => handleFiles(e.target.files)}
+          onChange={(e) => onFilesChange(e.target.files)}
           className="sr-only"
         />
       </div>
-
-      {previews.length > 0 ? (
-        <ul className="grid grid-cols-4 gap-2">
-          {previews.map((url, i) => (
-            <li key={url} className="relative">
-              {/* Vista previa local; next/image no aplica a object URLs. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt={`Foto ${i + 1}`}
-                className="aspect-square w-full rounded-lg border border-line object-cover"
-              />
-              {i === 0 && existingImages === 0 ? (
-                <span className="absolute left-1.5 top-1.5 rounded bg-brand-green px-1.5 py-0.5 text-xs font-medium text-white">
-                  Portada
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
     </section>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/contents-editor";
 import { StepIndicator, type Step } from "@/components/admin/form-steps";
 import { ImagePicker } from "@/components/admin/image-picker";
+import { PhotoRail } from "@/components/admin/photo-rail";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { suggestDescription } from "@/lib/actions/describe-image";
 import type { ActionState } from "@/lib/actions/products";
@@ -56,6 +57,7 @@ export function ProductForm({
   initial = EMPTY,
   submitLabel = "Guardar producto",
   existingImages = 0,
+  existingImageUrls = [],
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   groups: AttributeGroupWithValues[];
@@ -63,6 +65,8 @@ export function ProductForm({
   initial?: ProductFormValues;
   submitLabel?: string;
   existingImages?: number;
+  /** URLs de las fotos ya guardadas, para mostrarlas en el panel lateral. */
+  existingImageUrls?: string[];
 }) {
   const [state, formAction] = useActionState(action, {});
 
@@ -77,6 +81,23 @@ export function ProductForm({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [previews, setPreviews] = useState<string[]>([]);
+
+  // Las object URLs viven aquí y no en el selector, porque el panel lateral
+  // también las usa. Se liberan al cambiar de selección o al desmontar; si no,
+  // cada cambio de fotos dejaría memoria colgada.
+  useEffect(() => {
+    return () => previews.forEach((url) => URL.revokeObjectURL(url));
+  }, [previews]);
+
+  function pickFiles(list: FileList | null) {
+    setPreviews((old) => {
+      old.forEach((url) => URL.revokeObjectURL(url));
+      return list ? Array.from(list).map((f) => URL.createObjectURL(f)) : [];
+    });
+    setFiles(list);
+    setStepError(null);
+  }
 
   const slug = initial.slug || slugify(name);
   const hasPhoto = existingImages > 0 || (files?.length ?? 0) > 0;
@@ -120,7 +141,8 @@ export function ProductForm({
       const dataUrl = await downscaleToDataUrl(file);
       const result = await suggestDescription(dataUrl);
       if (result.description) setDescription(result.description);
-      else setSuggestError(result.error ?? "No se pudo generar la descripción.");
+      else
+        setSuggestError(result.error ?? "No se pudo generar la descripción.");
     } catch {
       setSuggestError("No se pudo leer la imagen.");
     } finally {
@@ -150,128 +172,140 @@ export function ProductForm({
         </p>
       ) : null}
 
-      {/* Todos los pasos quedan montados: ocultarlos con `hidden` conserva sus
+      {/* La foto queda fija a la derecha durante los cuatro pasos: la carga se
+          hace mirándola, sobre todo al listar qué incluye la caja. */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_22rem]">
+        <div className="flex flex-col gap-4">
+          {/* Todos los pasos quedan montados: ocultarlos con `hidden` conserva sus
           valores en el envío, cosa que desmontarlos perdería. */}
-      <div className={step === 1 ? "" : "hidden"}>
-        <ImagePicker
-          onFilesChange={(f) => {
-            setFiles(f);
-            setStepError(null);
-          }}
-          existingImages={existingImages}
-          error={state.fieldErrors?.images}
-        />
-      </div>
+          <div className={step === 1 ? "" : "hidden"}>
+            <ImagePicker
+              onFilesChange={pickFiles}
+              selectedCount={previews.length}
+              existingImages={existingImages}
+              error={state.fieldErrors?.images}
+            />
+          </div>
 
-      <div className={step === 2 ? "" : "hidden"}>
-        <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
-          <h2 className="text-base font-semibold text-brand-green">
-            Datos del regalo
-          </h2>
+          <div className={step === 2 ? "" : "hidden"}>
+            <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
+              <h2 className="text-base font-semibold text-brand-green">
+                Datos del regalo
+              </h2>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Field label="Nombre" required error={state.fieldErrors?.name}>
-              <input
-                name="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={200}
-                placeholder="Morning Box Cumpleaños"
-                className={inputClass}
-              />
-            </Field>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="Nombre" required error={state.fieldErrors?.name}>
+                  <input
+                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={200}
+                    placeholder="Morning Box Cumpleaños"
+                    className={inputClass}
+                  />
+                </Field>
 
-            <Field label="Precio" required error={state.fieldErrors?.price_usd}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-semibold text-ink-muted">$</span>
-                <input
-                  name="price_usd"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="44.00"
+                <Field
+                  label="Precio"
+                  required
+                  error={state.fieldErrors?.price_usd}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold text-ink-muted">
+                      $
+                    </span>
+                    <input
+                      name="price_usd"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={price}
+                      onChange={(e) => setPrice(e.target.value)}
+                      placeholder="44.00"
+                      className={inputClass}
+                    />
+                  </div>
+                </Field>
+              </div>
+
+              <Field
+                label="Descripción"
+                required
+                error={state.fieldErrors?.description}
+              >
+                <textarea
+                  name="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  maxLength={5000}
+                  placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
                   className={inputClass}
                 />
+                <div className="mt-1 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSuggest}
+                    disabled={!files?.length || suggesting}
+                    className="rounded-lg border-2 border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
+                  >
+                    {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
+                  </button>
+                  <span
+                    className={`text-sm ${suggestError ? "text-red-700" : "text-ink-muted"}`}
+                  >
+                    {suggestError ??
+                      (files?.length
+                        ? "La sugerencia es editable; revísala antes de guardar."
+                        : "Vuelve al paso 1 y elige una foto para poder sugerir.")}
+                  </span>
+                </div>
+              </Field>
+
+              <div className="flex flex-wrap gap-6 border-t border-line-soft pt-4">
+                <Toggle
+                  name="is_active"
+                  defaultChecked={initial.is_active}
+                  label="Publicado"
+                  hint="Visible en el catálogo"
+                />
+                <Toggle
+                  name="is_featured"
+                  defaultChecked={initial.is_featured}
+                  label="Destacado"
+                  hint="Aparece primero"
+                />
               </div>
-            </Field>
+
+              {slug ? (
+                <p className="text-sm text-ink-muted">
+                  Enlace público:{" "}
+                  <span className="font-medium text-brand-green">
+                    /catalogo/{slug}
+                  </span>
+                </p>
+              ) : null}
+            </section>
           </div>
 
-          <Field
-            label="Descripción"
-            required
-            error={state.fieldErrors?.description}
-          >
-            <textarea
-              name="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              maxLength={5000}
-              placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
-              className={inputClass}
-            />
-            <div className="mt-1 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSuggest}
-                disabled={!files?.length || suggesting}
-                className="rounded-lg border-2 border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
-              >
-                {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
-              </button>
-              <span
-                className={`text-sm ${suggestError ? "text-red-700" : "text-ink-muted"}`}
-              >
-                {suggestError ??
-                  (files?.length
-                    ? "La sugerencia es editable; revísala antes de guardar."
-                    : "Vuelve al paso 1 y elige una foto para poder sugerir.")}
-              </span>
-            </div>
-          </Field>
-
-          <div className="flex flex-wrap gap-6 border-t border-line-soft pt-4">
-            <Toggle
-              name="is_active"
-              defaultChecked={initial.is_active}
-              label="Publicado"
-              hint="Visible en el catálogo"
-            />
-            <Toggle
-              name="is_featured"
-              defaultChecked={initial.is_featured}
-              label="Destacado"
-              hint="Aparece primero"
+          <div className={step === 3 ? "" : "hidden"}>
+            <ContentsEditor
+              contents={contents}
+              onChange={(c) => {
+                setContents(c);
+                setStepError(null);
+              }}
+              presets={presets}
+              error={state.fieldErrors?.contents}
             />
           </div>
 
-          {slug ? (
-            <p className="text-sm text-ink-muted">
-              Enlace público:{" "}
-              <span className="font-medium text-brand-green">
-                /catalogo/{slug}
-              </span>
-            </p>
-          ) : null}
-        </section>
-      </div>
+          <div className={step === 4 ? "" : "hidden"}>
+            <TagPicker groups={groups} initialIds={initial.valueIds} />
+          </div>
+        </div>
 
-      <div className={step === 3 ? "" : "hidden"}>
-        <ContentsEditor
-          contents={contents}
-          onChange={(c) => {
-            setContents(c);
-            setStepError(null);
-          }}
-          presets={presets}
-          error={state.fieldErrors?.contents}
-        />
-      </div>
-
-      <div className={step === 4 ? "" : "hidden"}>
-        <TagPicker groups={groups} initialIds={initial.valueIds} />
+        <PhotoRail previews={previews} existingUrls={existingImageUrls} />
       </div>
 
       <input type="hidden" name="slug" value={slug} />
