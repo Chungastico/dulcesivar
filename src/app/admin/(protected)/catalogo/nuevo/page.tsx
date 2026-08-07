@@ -30,7 +30,7 @@ export default async function NewProductPage() {
   ]);
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex max-w-6xl flex-col gap-5">
       <div>
         <Link
           href="/admin/catalogo"

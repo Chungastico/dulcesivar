@@ -25,8 +25,15 @@
   --surface-raised: #ffffff;
 
   --ink: #14231d;
-  --ink-muted: #5c6b65;
-  --line: #e4e0d3;
+  /* Medidos, no elegidos a ojo. El anterior #5c6b65 pasaba como texto pero se
+     usaba también en placeholders al 60% de opacidad, donde caía a 2.49:1. */
+  --ink-muted: #4a5751;
+  /* El borde anterior (#e4e0d3) daba 1.23:1 contra la página: los campos
+     prácticamente no tenían borde visible. Este cumple el 3:1 que piden los
+     elementos de interfaz, sobre blanco y sobre crema. */
+  --line: #8f8a72;
+  /* Separadores decorativos, donde no hace falta el 3:1. */
+  --line-soft: #ded9c8;
 }
 
 @theme inline {
@@ -41,6 +48,7 @@
   --color-ink: var(--ink);
   --color-ink-muted: var(--ink-muted);
   --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);

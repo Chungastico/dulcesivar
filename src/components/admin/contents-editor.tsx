@@ -61,12 +61,12 @@ export function ContentsEditor({
   }, [presets]);
 
   return (
-    <fieldset className="flex flex-col gap-3 rounded-xl border border-line bg-surface-raised p-4">
+    <fieldset className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <legend className="text-sm font-medium text-brand-green">
+        <legend className="text-base font-semibold text-brand-green">
           ¿Qué incluye? <span className="text-brand-orange">*</span>
         </legend>
-        <span className="text-xs text-ink-muted">
+        <span className="text-sm text-ink-muted">
           {contents.length} ítem{contents.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -84,19 +84,19 @@ export function ContentsEditor({
                   update(i, { quantity: Number(e.target.value) || 1 })
                 }
                 aria-label={`Cantidad del ítem ${i + 1}`}
-                className="w-16 rounded-lg border border-line bg-surface px-2 py-1.5 text-center text-sm text-ink"
+                className="w-20 rounded-lg border-2 border-line bg-surface-raised px-2 py-2.5 text-center text-base font-medium text-ink"
               />
               <input
                 value={item.label}
                 onChange={(e) => update(i, { label: e.target.value })}
                 aria-label={`Nombre del ítem ${i + 1}`}
-                className="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm text-ink"
+                className="flex-1 rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink"
               />
               <button
                 type="button"
                 onClick={() => onChange(contents.filter((_, x) => x !== i))}
                 aria-label={`Quitar ítem ${i + 1}`}
-                className="rounded px-2 py-1 text-sm text-ink-muted transition hover:bg-red-50 hover:text-red-700"
+                className="rounded-lg border-2 border-transparent px-3 py-2 text-base text-ink-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
               >
                 ✕
               </button>
@@ -118,20 +118,20 @@ export function ContentsEditor({
             }
           }}
           placeholder="Escribe para buscar un insumo, o agrega uno nuevo…"
-          className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none"
+          className="w-full rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none focus:ring-4 focus:ring-brand-teal/20"
         />
 
         {query.trim() ? (
-          <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-line bg-surface-raised shadow-lg">
+          <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border-2 border-line bg-surface-raised shadow-xl">
             {matches.map((m) => (
               <li key={m.id}>
                 <button
                   type="button"
                   onClick={() => add(m.label)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-ink hover:bg-brand-teal/10"
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-base text-ink hover:bg-brand-teal/15"
                 >
                   {m.label}
-                  <span className="text-xs text-ink-muted">{m.category}</span>
+                  <span className="text-sm text-ink-muted">{m.category}</span>
                 </button>
               </li>
             ))}
@@ -139,7 +139,7 @@ export function ContentsEditor({
               <button
                 type="button"
                 onClick={() => add(query.trim())}
-                className="w-full px-3 py-2 text-left text-sm text-brand-green hover:bg-brand-cream/50"
+                className="w-full px-4 py-3 text-left text-base font-medium text-brand-green hover:bg-brand-cream/60"
               >
                 + Agregar «{query.trim()}» como ítem libre
               </button>
@@ -152,7 +152,7 @@ export function ContentsEditor({
         <button
           type="button"
           onClick={() => setPasting((v) => !v)}
-          className="rounded-lg border border-dashed border-brand-teal px-3 py-1.5 text-xs font-medium text-brand-green transition hover:bg-brand-teal/10"
+          className="rounded-lg border-2 border-dashed border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10"
         >
           {pasting ? "Cerrar" : "Pegar lista completa"}
         </button>
@@ -160,7 +160,7 @@ export function ContentsEditor({
 
       {pasting ? (
         <div className="flex flex-col gap-2 rounded-lg border border-brand-teal/40 bg-brand-teal/5 p-3">
-          <p className="text-xs text-ink-muted">
+          <p className="text-sm text-ink-muted">
             Pega la lista tal como la tienes, una línea por ítem. Las viñetas se
             quitan solas y el número inicial se toma como cantidad.
           </p>
@@ -169,7 +169,7 @@ export function ContentsEditor({
             onChange={(e) => setDraft(e.target.value)}
             rows={5}
             placeholder={"• 1 Vaso vinero personalizado\n• 3 chocolates Ferrero"}
-            className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2 font-mono text-xs text-ink focus:border-brand-teal focus:outline-none"
+            className="w-full rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 font-mono text-sm text-ink focus:border-brand-teal focus:outline-none"
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -180,7 +180,7 @@ export function ContentsEditor({
                 setDraft("");
                 setPasting(false);
               }}
-              className="rounded-lg bg-brand-green px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-lg bg-brand-green px-4 py-2 text-base font-medium text-white transition hover:opacity-90 disabled:opacity-40"
             >
               Agregar {parseContentList(draft).length || ""} ítems
             </button>
@@ -192,7 +192,7 @@ export function ContentsEditor({
                 setDraft("");
                 setPasting(false);
               }}
-              className="rounded-lg border border-line px-3 py-1.5 text-xs text-ink-muted transition hover:bg-brand-cream/40 disabled:opacity-40"
+              className="rounded-lg border-2 border-line px-4 py-2 text-base text-ink transition hover:bg-brand-cream/50 disabled:opacity-40"
             >
               Reemplazar todo
             </button>
@@ -202,17 +202,17 @@ export function ContentsEditor({
 
       {/* Los más usados, a un clic, sin tener que escribir nada. */}
       {contents.length === 0 && byCategory.length > 0 ? (
-        <div className="flex flex-col gap-2 border-t border-line pt-3">
-          <p className="text-xs text-ink-muted">O elige de los más comunes:</p>
+        <div className="flex flex-col gap-3 border-t border-line-soft pt-4">
+          <p className="text-sm font-medium text-ink">O elige de los más comunes:</p>
           {byCategory.slice(0, 3).map(([category, items]) => (
             <div key={category} className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-ink-muted">{category}:</span>
+              <span className="w-full text-sm text-ink-muted sm:w-28 sm:shrink-0">{category}</span>
               {items.slice(0, 5).map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => add(item.label)}
-                  className="rounded-full border border-line px-2.5 py-1 text-xs text-ink transition hover:border-brand-teal hover:bg-brand-teal/10"
+                  className="rounded-lg border-2 border-line bg-surface-raised px-3 py-1.5 text-base text-ink transition hover:border-brand-teal hover:bg-brand-teal/15"
                 >
                   + {item.label}
                 </button>
@@ -222,7 +222,7 @@ export function ContentsEditor({
         </div>
       ) : null}
 
-      {error ? <p className="text-xs text-red-700">{error}</p> : null}
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
       <input type="hidden" name="contents" value={JSON.stringify(contents)} />
     </fieldset>
   );

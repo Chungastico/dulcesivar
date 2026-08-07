@@ -54,7 +54,7 @@ export default async function EditProductPage({
   const publicUrlBase = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
 
   return (
-    <div className="flex max-w-3xl flex-col gap-6">
+    <div className="flex max-w-6xl flex-col gap-5">
       <div>
         <Link
           href="/admin/catalogo"

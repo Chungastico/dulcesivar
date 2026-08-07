@@ -37,7 +37,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       />
 
       <main className="w-full flex-1 px-5 py-8 lg:px-10">
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
+        <div className="mx-auto w-full max-w-6xl">{children}</div>
       </main>
     </div>
   );

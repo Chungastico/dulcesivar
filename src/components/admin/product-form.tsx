@@ -4,10 +4,16 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { ContentsEditor, type ContentItem } from "@/components/admin/contents-editor";
+import {
+  ContentsEditor,
+  type ContentItem,
+} from "@/components/admin/contents-editor";
+import { StepIndicator, type Step } from "@/components/admin/form-steps";
+import { ImagePicker } from "@/components/admin/image-picker";
+import { TagPicker } from "@/components/admin/tag-picker";
 import { suggestDescription } from "@/lib/actions/describe-image";
-import { downscaleToDataUrl } from "@/lib/downscale-image";
 import type { ActionState } from "@/lib/actions/products";
+import { downscaleToDataUrl } from "@/lib/downscale-image";
 import { slugify } from "@/lib/slug";
 import type {
   AttributeGroupWithValues,
@@ -36,6 +42,13 @@ const EMPTY: ProductFormValues = {
   contents: [],
 };
 
+const STEPS: Step[] = [
+  { id: 1, label: "Foto", hint: "Cómo se ve el regalo" },
+  { id: 2, label: "Datos", hint: "Nombre y precio" },
+  { id: 3, label: "Qué incluye", hint: "Los ítems de la caja" },
+  { id: 4, label: "Etiquetas", hint: "Dónde aparece" },
+];
+
 export function ProductForm({
   action,
   groups,
@@ -49,30 +62,58 @@ export function ProductForm({
   presets: ContentPreset[];
   initial?: ProductFormValues;
   submitLabel?: string;
-  /** Imágenes ya guardadas: si hay, subir una nueva deja de ser obligatorio. */
   existingImages?: number;
 }) {
   const [state, formAction] = useActionState(action, {});
 
+  const [step, setStep] = useState(1);
+  const [furthest, setFurthest] = useState(1);
+
   const [name, setName] = useState(initial.name);
-  const [contents, setContents] = useState(initial.contents);
-  const [newImages, setNewImages] = useState(0);
+  const [price, setPrice] = useState(initial.price_usd);
   const [description, setDescription] = useState(initial.description);
+  const [contents, setContents] = useState(initial.contents);
   const [files, setFiles] = useState<FileList | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [stepError, setStepError] = useState<string | null>(null);
 
-  // El slug se deriva del nombre y nunca se muestra como campo editable: es
-  // jerga técnica. En un producto ya publicado se congela, porque cambiarlo
-  // rompería los links que ya se compartieron por WhatsApp.
   const slug = initial.slug || slugify(name);
+  const hasPhoto = existingImages > 0 || (files?.length ?? 0) > 0;
 
-  // Sugerir descripción a partir de la primera foto elegida. La respuesta
-  // rellena el campo pero queda editable: es su catálogo y el tono lo pone ella.
+  // Validación por paso. Se hace aquí y no con el atributo `required` del HTML
+  // porque los pasos ocultos siguen montados (desmontarlos perdería sus
+  // valores al enviar) y un campo required invisible bloquea el submit con un
+  // error del navegador que el usuario no puede ver ni corregir.
+  function validate(target: number): string | null {
+    if (target > 1 && !hasPhoto) return "Agrega al menos una foto del regalo.";
+    if (target > 2) {
+      if (name.trim().length < 2) return "Escribe el nombre del regalo.";
+      if (!price.trim() || Number(price) < 0) return "Escribe el precio.";
+      if (description.trim().length < 10)
+        return "Escribe una descripción de al menos 10 caracteres.";
+    }
+    if (target > 3 && contents.length === 0)
+      return "Agrega al menos un ítem de lo que incluye.";
+    return null;
+  }
+
+  function go(target: number) {
+    if (target > step) {
+      const problem = validate(target);
+      if (problem) {
+        setStepError(problem);
+        return;
+      }
+    }
+    setStepError(null);
+    setStep(target);
+    setFurthest((f) => Math.max(f, target));
+  }
+
   async function handleSuggest() {
     const file = files?.[0];
     if (!file) return;
-
     setSuggesting(true);
     setSuggestError(null);
     try {
@@ -86,228 +127,243 @@ export function ProductForm({
       setSuggesting(false);
     }
   }
-  const needsImage = existingImages === 0 && newImages === 0;
+
+  const isLast = step === STEPS.length;
 
   return (
-    <form action={formAction} className="flex flex-col gap-5">
+    <form action={formAction} className="flex flex-col gap-4 pb-24">
+      <StepIndicator
+        steps={STEPS}
+        current={step}
+        furthest={furthest}
+        onGo={go}
+      />
+
       {state.error ? (
-        <p className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 text-base text-red-800">
           {state.error}
         </p>
       ) : null}
+      {stepError ? (
+        <p className="rounded-xl border-2 border-brand-orange bg-brand-orange/10 px-4 py-3 text-base text-ink">
+          {stepError}
+        </p>
+      ) : null}
 
-      {/* Datos básicos, en dos columnas para no estirar la página */}
-      <section className="grid gap-4 rounded-xl border border-line bg-surface-raised p-4 sm:grid-cols-2">
-        <Field
-          label="Nombre del regalo"
-          required
-          error={state.fieldErrors?.name}
-          className="sm:col-span-2"
-        >
-          <input
-            name="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+      {/* Todos los pasos quedan montados: ocultarlos con `hidden` conserva sus
+          valores en el envío, cosa que desmontarlos perdería. */}
+      <div className={step === 1 ? "" : "hidden"}>
+        <ImagePicker
+          onFilesChange={(f) => {
+            setFiles(f);
+            setStepError(null);
+          }}
+          existingImages={existingImages}
+          error={state.fieldErrors?.images}
+        />
+      </div>
+
+      <div className={step === 2 ? "" : "hidden"}>
+        <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
+          <h2 className="text-base font-semibold text-brand-green">
+            Datos del regalo
+          </h2>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Nombre" required error={state.fieldErrors?.name}>
+              <input
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                maxLength={200}
+                placeholder="Morning Box Cumpleaños"
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Precio" required error={state.fieldErrors?.price_usd}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-semibold text-ink-muted">$</span>
+                <input
+                  name="price_usd"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="44.00"
+                  className={inputClass}
+                />
+              </div>
+            </Field>
+          </div>
+
+          <Field
+            label="Descripción"
             required
-            maxLength={200}
-            placeholder="Morning Box Cumpleaños"
-            className={inputClass}
-          />
-        </Field>
-
-        <Field label="Precio" required error={state.fieldErrors?.price_usd}>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-ink-muted">$</span>
-            <input
-              name="price_usd"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              defaultValue={initial.price_usd}
-              placeholder="44.00"
+            error={state.fieldErrors?.description}
+          >
+            <textarea
+              name="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={5000}
+              placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
               className={inputClass}
             />
-          </div>
-        </Field>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSuggest}
+                disabled={!files?.length || suggesting}
+                className="rounded-lg border-2 border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
+              >
+                {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
+              </button>
+              <span
+                className={`text-sm ${suggestError ? "text-red-700" : "text-ink-muted"}`}
+              >
+                {suggestError ??
+                  (files?.length
+                    ? "La sugerencia es editable; revísala antes de guardar."
+                    : "Vuelve al paso 1 y elige una foto para poder sugerir.")}
+              </span>
+            </div>
+          </Field>
 
-        <div className="flex items-end gap-4 pb-1">
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
+          <div className="flex flex-wrap gap-6 border-t border-line-soft pt-4">
+            <Toggle
               name="is_active"
               defaultChecked={initial.is_active}
-              className="size-4"
+              label="Publicado"
+              hint="Visible en el catálogo"
             />
-            Publicado
-          </label>
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
+            <Toggle
               name="is_featured"
               defaultChecked={initial.is_featured}
-              className="size-4"
+              label="Destacado"
+              hint="Aparece primero"
             />
-            Destacado
-          </label>
-        </div>
+          </div>
 
-        <Field
-          label="Descripción"
-          required
-          error={state.fieldErrors?.description}
-          className="sm:col-span-2"
-        >
-          <textarea
-            name="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            required
-            maxLength={5000}
-            placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
-            className={inputClass}
-          />
-          <div className="flex flex-wrap items-center gap-2">
+          {slug ? (
+            <p className="text-sm text-ink-muted">
+              Enlace público:{" "}
+              <span className="font-medium text-brand-green">
+                /catalogo/{slug}
+              </span>
+            </p>
+          ) : null}
+        </section>
+      </div>
+
+      <div className={step === 3 ? "" : "hidden"}>
+        <ContentsEditor
+          contents={contents}
+          onChange={(c) => {
+            setContents(c);
+            setStepError(null);
+          }}
+          presets={presets}
+          error={state.fieldErrors?.contents}
+        />
+      </div>
+
+      <div className={step === 4 ? "" : "hidden"}>
+        <TagPicker groups={groups} initialIds={initial.valueIds} />
+      </div>
+
+      <input type="hidden" name="slug" value={slug} />
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface-raised/95 backdrop-blur lg:left-64">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-5 py-3">
+          {step > 1 ? (
             <button
               type="button"
-              onClick={handleSuggest}
-              disabled={!files?.length || suggesting}
-              title={
-                files?.length
-                  ? "Genera una sugerencia a partir de la primera foto"
-                  : "Elige una foto abajo para poder sugerir"
-              }
-              className="rounded-lg border border-brand-teal px-2.5 py-1 text-xs font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
+              onClick={() => go(step - 1)}
+              className="rounded-lg border-2 border-line px-5 py-2.5 text-base font-medium text-ink transition hover:bg-brand-cream/50"
             >
-              {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
+              ← Atrás
             </button>
-            {suggestError ? (
-              <span className="text-xs text-red-700">{suggestError}</span>
-            ) : (
-              <span className="text-xs text-ink-muted">
-                La sugerencia es editable; revísala antes de guardar.
-              </span>
-            )}
-          </div>
-        </Field>
+          ) : null}
 
-        {slug ? (
-          <p className="text-xs text-ink-muted sm:col-span-2">
-            Enlace público:{" "}
-            <span className="text-brand-green">/catalogo/{slug}</span>
-          </p>
-        ) : null}
-        <input type="hidden" name="slug" value={slug} />
-      </section>
+          {isLast ? (
+            <SubmitButton label={submitLabel} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => go(step + 1)}
+              className="rounded-lg bg-brand-green px-6 py-2.5 text-base font-semibold text-white transition hover:opacity-90"
+            >
+              Siguiente →
+            </button>
+          )}
 
-      <ContentsEditor
-        contents={contents}
-        onChange={setContents}
-        presets={presets}
-        error={state.fieldErrors?.contents}
-      />
+          <span className="ml-auto hidden text-sm text-ink-muted sm:block">
+            Paso {step} de {STEPS.length}
+          </span>
 
-      {/* Imágenes */}
-      <section className="flex flex-col gap-2 rounded-xl border border-line bg-surface-raised p-4">
-        <span className="text-sm font-medium text-brand-green">
-          Fotos {existingImages === 0 ? <Req /> : null}
-        </span>
-        <input
-          type="file"
-          name="images"
-          multiple
-          required={needsImage}
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          onChange={(e) => {
-            setFiles(e.target.files);
-            setNewImages(e.target.files?.length ?? 0);
-          }}
-          className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-green file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
-        />
-        <p className="text-xs text-ink-muted">
-          {existingImages > 0
-            ? `Ya tiene ${existingImages} foto${existingImages === 1 ? "" : "s"}. Estas se agregan.`
-            : "Al menos una. La primera será la portada."}
-        </p>
-        {state.fieldErrors?.images ? (
-          <p className="text-xs text-red-700">{state.fieldErrors.images}</p>
-        ) : null}
-      </section>
-
-      {/* Clasificación: chips compactos, un eje por bloque */}
-      <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface-raised p-4">
-        <span className="text-sm font-medium text-brand-green">
-          Clasificación
-        </span>
-        {groups.map((group) => (
-          <fieldset key={group.id} className="flex flex-wrap items-center gap-2">
-            <legend className="sr-only">{group.name}</legend>
-            <span className="w-full text-xs font-medium text-ink-muted sm:w-32 sm:shrink-0">
-              {group.name}
-            </span>
-            {group.attribute_values
-              .filter((v) => v.is_active)
-              .sort((a, b) => a.sort_order - b.sort_order)
-              .map((value) => (
-                <label
-                  key={value.id}
-                  className="cursor-pointer rounded-full border border-line px-2.5 py-1 text-xs text-ink transition has-checked:border-brand-teal has-checked:bg-brand-teal/15 has-checked:font-medium has-checked:text-brand-green"
-                >
-                  <input
-                    type="checkbox"
-                    name="valueIds"
-                    value={value.id}
-                    defaultChecked={initial.valueIds.includes(value.id)}
-                    className="sr-only"
-                  />
-                  {value.name}
-                </label>
-              ))}
-          </fieldset>
-        ))}
-      </section>
-
-      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line bg-surface/95 py-3 backdrop-blur">
-        <SubmitButton label={submitLabel} />
-        <Link
-          href="/admin/catalogo"
-          className="rounded-lg border border-line bg-surface-raised px-4 py-2 text-sm font-medium text-ink-muted transition hover:bg-brand-cream/40"
-        >
-          Cancelar
-        </Link>
+          <Link
+            href="/admin/catalogo"
+            className="text-base text-ink-muted transition hover:text-ink hover:underline"
+          >
+            Cancelar
+          </Link>
+        </div>
       </div>
     </form>
   );
 }
 
 const inputClass =
-  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/25";
+  "w-full rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none focus:ring-4 focus:ring-brand-teal/20";
 
-function Req() {
-  return <span className="text-brand-orange">*</span>;
+function Toggle({
+  name,
+  label,
+  hint,
+  defaultChecked,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  defaultChecked: boolean;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5">
+      <input
+        type="checkbox"
+        name={name}
+        defaultChecked={defaultChecked}
+        className="size-5 accent-[var(--brand-green)]"
+      />
+      <span className="flex flex-col">
+        <span className="text-base text-ink">{label}</span>
+        <span className="text-sm text-ink-muted">{hint}</span>
+      </span>
+    </label>
+  );
 }
 
 function Field({
   label,
   required,
   error,
-  className = "",
   children,
 }: {
   label: string;
   required?: boolean;
   error?: string;
-  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-sm font-medium text-brand-green">
-        {label} {required ? <Req /> : null}
+    <label className="flex flex-col gap-2">
+      <span className="text-base font-medium text-ink">
+        {label} {required ? <span className="text-brand-orange">*</span> : null}
       </span>
       {children}
-      {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      {error ? <span className="text-sm text-red-700">{error}</span> : null}
     </label>
   );
 }
@@ -318,7 +374,7 @@ function SubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-brand-green px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      className="rounded-lg bg-brand-green px-6 py-2.5 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? "Guardando…" : label}
     </button>
