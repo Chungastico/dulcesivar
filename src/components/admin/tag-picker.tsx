@@ -92,12 +92,12 @@ export function TagPicker({
             disabled={!suggestion.available || suggestion.loading}
             title={
               suggestion.available
-                ? "Propone etiquetas mirando la foto"
-                : "Elige una foto en el paso 1 para poder sugerir"
+                ? "Vuelve a analizar la foto"
+                : "Elige una foto en el paso 1"
             }
             className="rounded-lg border-2 border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
           >
-            {suggestion.loading ? "Analizando…" : "✨ Sugerir desde la foto"}
+            {suggestion.loading ? "Analizando…" : "✨ Volver a generar"}
           </button>
         ) : null}
       </div>
@@ -108,9 +108,9 @@ export function TagPicker({
         </p>
       ) : pendientes > 0 ? (
         <p className="rounded-lg border-2 border-brand-teal bg-brand-teal/10 px-3 py-2 text-sm text-brand-green">
-          {pendientes} etiqueta{pendientes === 1 ? "" : "s"} sugerida
-          {pendientes === 1 ? "" : "s"} (marcadas con ✨). Revísalas: quita las
-          que no apliquen y agrega las que falten.
+          {pendientes} etiqueta{pendientes === 1 ? "" : "s"} marcada
+          {pendientes === 1 ? "" : "s"} automáticamente desde la foto (✨).
+          Revísalas: quita las que no apliquen y agrega las que falten.
         </p>
       ) : null}
 

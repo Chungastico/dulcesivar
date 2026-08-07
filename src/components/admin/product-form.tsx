@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -79,13 +79,17 @@ export function ProductForm({
   const [description, setDescription] = useState(initial.description);
   const [contents, setContents] = useState(initial.contents);
   const [files, setFiles] = useState<FileList | null>(null);
-  const [suggesting, setSuggesting] = useState(false);
-  const [suggestError, setSuggestError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<string[]>([]);
-  const [tagPicks, setTagPicks] = useState<Record<string, string[]> | null>(null);
-  const [taggingBusy, setTaggingBusy] = useState(false);
+  const [tagPicks, setTagPicks] = useState<Record<string, string[]> | null>(
+    null,
+  );
+  const [analyzing, setAnalyzing] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
+  // Sin esto, volver al paso 1 y reelegir la misma foto relanzaría el análisis
+  // y pisaría lo que ella ya hubiera corregido.
+  const analyzedFor = useRef<File | null>(null);
 
   // Las object URLs viven aquí y no en el selector, porque el panel lateral
   // también las usa. Se liberan al cambiar de selección o al desmontar; si no,
@@ -101,6 +105,59 @@ export function ProductForm({
     });
     setFiles(list);
     setStepError(null);
+
+    // Se analiza sola al elegir la foto. Preguntar cada vez es fricción cuando
+    // la respuesta siempre va a ser que sí, y para cuando llega al paso 2 la
+    // descripción ya está puesta.
+    const file = list?.[0];
+    if (file && file !== analyzedFor.current) {
+      analyzedFor.current = file;
+      void analyzePhoto(file);
+    }
+  }
+
+  /**
+   * Descripción y etiquetas en una sola pasada.
+   *
+   * La imagen se reduce una vez y se reutiliza para ambas llamadas, que van en
+   * paralelo: reducirla dos veces costaría el doble de espera sin ganar nada.
+   */
+  async function analyzePhoto(file: File, { force = false } = {}) {
+    setAnalyzing(true);
+    setSuggestError(null);
+    setTagError(null);
+    try {
+      const dataUrl = await downscaleToDataUrl(file);
+      const [descRes, tagRes] = await Promise.all([
+        suggestDescription(dataUrl),
+        suggestTags(
+          dataUrl,
+          groups.map((g) => ({
+            slug: g.slug,
+            name: g.name,
+            values: g.attribute_values
+              .filter((v) => v.is_active)
+              .map((v) => ({ slug: v.slug, name: v.name })),
+          })),
+        ),
+      ]);
+
+      if (descRes.description) {
+        // No pisa lo que ella ya escribió, salvo que pida regenerar a propósito.
+        setDescription((prev) =>
+          force || !prev.trim() ? descRes.description! : prev,
+        );
+      } else if (descRes.error) {
+        setSuggestError(descRes.error);
+      }
+
+      if (tagRes.picked) setTagPicks(tagRes.picked);
+      else if (tagRes.error) setTagError(tagRes.error);
+    } catch {
+      setSuggestError("No se pudo leer la imagen.");
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   const slug = initial.slug || slugify(name);
@@ -134,52 +191,6 @@ export function ProductForm({
     setStepError(null);
     setStep(target);
     setFurthest((f) => Math.max(f, target));
-  }
-
-  async function handleSuggest() {
-    const file = files?.[0];
-    if (!file) return;
-    setSuggesting(true);
-    setSuggestError(null);
-    try {
-      const dataUrl = await downscaleToDataUrl(file);
-      const result = await suggestDescription(dataUrl);
-      if (result.description) setDescription(result.description);
-      else
-        setSuggestError(result.error ?? "No se pudo generar la descripción.");
-    } catch {
-      setSuggestError("No se pudo leer la imagen.");
-    } finally {
-      setSuggesting(false);
-    }
-  }
-
-  async function handleSuggestTags() {
-    const file = files?.[0];
-    if (!file) return;
-    setTaggingBusy(true);
-    setTagError(null);
-    try {
-      const dataUrl = await downscaleToDataUrl(file);
-      // Se manda solo lo que el modelo necesita para elegir; el resto de la
-      // taxonomía (ids, orden, fechas) no le aporta y encarece la llamada.
-      const result = await suggestTags(
-        dataUrl,
-        groups.map((g) => ({
-          slug: g.slug,
-          name: g.name,
-          values: g.attribute_values
-            .filter((v) => v.is_active)
-            .map((v) => ({ slug: v.slug, name: v.name })),
-        })),
-      );
-      if (result.error) setTagError(result.error);
-      else setTagPicks(result.picked ?? {});
-    } catch {
-      setTagError("No se pudo leer la imagen.");
-    } finally {
-      setTaggingBusy(false);
-    }
   }
 
   const isLast = step === STEPS.length;
@@ -277,11 +288,13 @@ export function ProductForm({
                 <div className="mt-1 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={handleSuggest}
-                    disabled={!files?.length || suggesting}
+                    onClick={() =>
+                      files?.[0] && analyzePhoto(files[0], { force: true })
+                    }
+                    disabled={!files?.length || analyzing}
                     className="rounded-lg border-2 border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
                   >
-                    {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
+                    {analyzing ? "Analizando…" : "✨ Volver a generar"}
                   </button>
                   <span
                     className={`text-sm ${suggestError ? "text-red-700" : "text-ink-muted"}`}
@@ -334,16 +347,17 @@ export function ProductForm({
 
           <div className={step === 4 ? "" : "hidden"}>
             <TagPicker
-          groups={groups}
-          initialIds={initial.valueIds}
-          suggestion={{
-            picked: tagPicks,
-            loading: taggingBusy,
-            error: tagError,
-            available: (files?.length ?? 0) > 0,
-            onRequest: handleSuggestTags,
-          }}
-        />
+              groups={groups}
+              initialIds={initial.valueIds}
+              suggestion={{
+                picked: tagPicks,
+                loading: analyzing,
+                error: tagError,
+                available: (files?.length ?? 0) > 0,
+                onRequest: () =>
+                  files?.[0] && void analyzePhoto(files[0], { force: true }),
+              }}
+            />
           </div>
         </div>
 

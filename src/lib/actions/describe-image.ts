@@ -39,15 +39,14 @@ const MAX_TOKENS = 600;
 const TIMEOUT_MS = 25_000;
 
 /**
- * La foto es de un pedido ya entregado, así que trae dos clases de detalle que
- * no describen el producto de catálogo:
- *   - la personalización de ESE cliente (un nombre grabado, una dedicatoria);
- *   - el adorno de ESA entrega (el color del moño, el papel, el lazo).
- * Ninguno se repite igual en la siguiente unidad. Lo que sí se repite, y es lo
- * que la clienta necesita leer, son los artículos que van dentro.
+ * La foto es de un pedido ya entregado. Todo lo que la hace única a ESE pedido
+ * sobra en un catálogo, porque el siguiente comprador lo pedirá distinto:
+ *   - la personalización (un nombre grabado, una dedicatoria, una fecha);
+ *   - el adorno de esa entrega (el moño, el papel, el relleno);
+ *   - y el color, que se elige por encargo: ese globo azul puede salir rojo.
  *
- * Los ejemplos de abajo no son decorativos: sin ellos el modelo enumera cada
- * envoltorio y repite "personalizado" en cada artículo.
+ * Lo único estable entre unidades es QUÉ artículos van dentro. El prompt se
+ * limita a eso.
  */
 const PROMPT = [
   "Eres quien redacta el catálogo de Dulces Sivar, una tienda salvadoreña de",
@@ -55,19 +54,19 @@ const PROMPT = [
   "Escribe UNA sola oración de venta en español neutro de El Salvador, de 15 a",
   "25 palabras, sobre el regalo de la foto.",
   "",
-  "NOMBRA los artículos principales que van dentro (termo, vaso, taza,",
-  "chocolates, flores, peluche, globo, tarjeta, caja).",
-  "Puedes decir el color de uno o dos artículos principales, nada más.",
+  "NOMBRA los artículos principales que van dentro (peluche, chocolates,",
+  "globo, termo, vaso, taza, flores, tarjeta, caja).",
   "",
-  "NO menciones: nombres propios, dedicatorias, fechas ni texto escrito sobre",
-  "nada; colores de moños, lazos, papel o relleno; ni la palabra",
-  "«personalizado» más de una vez en toda la oración.",
+  "NO menciones NINGÚN color. El color se elige por encargo y cambia en cada",
+  "pedido, así que decirlo desinforma a quien lee el catálogo.",
+  "Tampoco menciones nombres propios, dedicatorias, fechas ni texto escrito",
+  "sobre nada; ni moños, lazos, papel o relleno; ni la palabra «personalizado»",
+  "más de una vez.",
   "",
-  "Ejemplo CORRECTO: «Caja de madera con termo negro, chocolates y tarjeta,",
-  "un detalle elegante para sorprender en cualquier ocasión.»",
-  "Ejemplo INCORRECTO: «Regala termo negro personalizado, termo gris con tapa",
-  "transparente, chocolates envueltos en dorado, tarjeta personalizada y moño",
-  "café.»",
+  "Ejemplo CORRECTO: «Caja de regalo con peluche, chocolates y globo, un",
+  "detalle encantador para sorprender a quien más quieres.»",
+  "Ejemplo INCORRECTO: «Caja de regalo con peluche café, chocolates y globo",
+  "azul con dedicatoria, y moño azul.»",
   "",
   "No inventes precios, marcas ni cantidades que no se vean con claridad.",
   "No empieces con «Esta imagen muestra» ni describas el fondo ni la mesa.",
