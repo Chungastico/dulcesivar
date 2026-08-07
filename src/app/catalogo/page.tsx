@@ -42,8 +42,6 @@ export default async function CatalogoPage({
   const groups = (groupsResult.data ?? []) as AttributeGroupWithValues[];
   const products = (productsResult.data ?? []) as CatalogProduct[];
 
-  // Un índice "eje:opción -> id" evita recorrer la taxonomía por cada producto
-  // al filtrar y al contar facetas.
   const slugToId = new Map<string, string>();
   for (const group of groups) {
     for (const value of group.attribute_values) {
@@ -69,10 +67,6 @@ export default async function CatalogoPage({
     <main className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8">
       <header className="mb-6">
         <h1 className="text-3xl font-semibold text-brand-green">Catálogo</h1>
-        <p className="mt-1 text-base text-ink-muted">
-          Regalos armados para cada ocasión. Filtra y comparte el enlace ya
-          filtrado.
-        </p>
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[16rem_1fr]">

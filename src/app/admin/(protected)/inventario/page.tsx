@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 
 import { NewItemForm } from "@/components/admin/new-item-form";
 import { PurchaseForm } from "@/components/admin/purchase-form";
-import { ResetInventoryButton } from "@/components/admin/reset-inventory-button";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { InventoryStatus, ProductCost } from "@/lib/supabase/types";
@@ -57,10 +56,6 @@ export default async function InventarioPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-brand-green">Inventario</h1>
-          <p className="mt-1 max-w-2xl text-base text-ink-muted">
-            Registra lo que compras y con qué precio. Con eso se calcula el
-            costo de armar cada regalo y su margen.
-          </p>
         </div>
 
         <div className="flex flex-col items-end gap-2">
@@ -70,7 +65,6 @@ export default async function InventarioPage() {
           >
             📦 Cargar stock por lote
           </Link>
-          <ResetInventoryButton />
         </div>
       </div>
 
@@ -96,11 +90,6 @@ export default async function InventarioPage() {
             <h2 className="text-base font-semibold text-brand-green">
               Costo por insumo
             </h2>
-            <p className="text-sm text-ink-muted">
-              El costo unitario es el promedio ponderado de todo lo comprado, así
-              que mezcla correctamente lo que traes a mayoreo con lo suelto.
-            </p>
-
             <div className="overflow-x-auto">
               <table className="w-full min-w-[34rem] text-left text-base">
                 <thead>
