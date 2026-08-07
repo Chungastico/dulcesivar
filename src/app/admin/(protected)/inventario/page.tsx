@@ -1,6 +1,9 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
+import { NewItemForm } from "@/components/admin/new-item-form";
 import { PurchaseForm } from "@/components/admin/purchase-form";
+import { ResetInventoryButton } from "@/components/admin/reset-inventory-button";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { InventoryStatus, ProductCost } from "@/lib/supabase/types";
@@ -41,20 +44,34 @@ export default async function InventarioPage() {
   const conCosto = items.filter((i) => i.avg_unit_cost != null).length;
 
   const byCategory = new Map<string, InventoryStatus[]>();
+  const categories = new Set<string>();
   for (const item of items) {
     const list = byCategory.get(item.category) ?? [];
     list.push(item);
     byCategory.set(item.category, list);
+    categories.add(item.category);
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-brand-green">Inventario</h1>
-        <p className="mt-1 max-w-2xl text-base text-ink-muted">
-          Registra lo que compras y con qué precio. Con eso se calcula el costo
-          de armar cada regalo y su margen.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-brand-green">Inventario</h1>
+          <p className="mt-1 max-w-2xl text-base text-ink-muted">
+            Registra lo que compras y con qué precio. Con eso se calcula el
+            costo de armar cada regalo y su margen.
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          <Link
+            href="/admin/inventario/carga-inicial"
+            className="rounded-lg bg-brand-orange px-4 py-2.5 text-base font-semibold text-ink transition hover:brightness-95"
+          >
+            📦 Cargar stock por lote
+          </Link>
+          <ResetInventoryButton />
+        </div>
       </div>
 
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -69,7 +86,10 @@ export default async function InventarioPage() {
       </dl>
 
       <div className="grid items-start gap-5 lg:grid-cols-[24rem_1fr]">
-        <PurchaseForm items={items} />
+        <div className="flex flex-col gap-5">
+          <PurchaseForm items={items} />
+          <NewItemForm categories={[...categories].sort()} />
+        </div>
 
         <div className="flex flex-col gap-5">
           <section className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-5">

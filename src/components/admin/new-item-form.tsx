@@ -1,0 +1,112 @@
+"use client";
+
+import { useActionState, useState } from "react";
+import { useFormStatus } from "react-dom";
+
+import { createInventoryItem } from "@/lib/actions/inventory";
+
+/**
+ * Alta de un insumo nuevo en la biblioteca.
+ *
+ * Sin esto, la única forma de agregar artículos era la migración SQL con los
+ * 74 insumos iniciales: cualquier cosa que ella compre después no tenía dónde
+ * entrar. El datalist de categorías reutiliza las que ya existen para que no
+ * termine con "Comestibles" y "comestibles" como categorías distintas.
+ */
+export function NewItemForm({ categories }: { categories: string[] }) {
+  const [state, action] = useActionState(createInventoryItem, {});
+  const [key, setKey] = useState(0);
+
+  return (
+    <form
+      key={key}
+      action={async (fd) => {
+        await action(fd);
+        setKey((k) => k + 1);
+      }}
+      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-5"
+    >
+      <h2 className="text-base font-semibold text-brand-green">
+        Agregar insumo nuevo
+      </h2>
+      <p className="text-sm text-ink-muted">
+        ¿No aparece en la lista de «Registrar compra»? Créalo aquí.
+      </p>
+
+      {state.error ? (
+        <p className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {state.error}
+        </p>
+      ) : null}
+      {state.ok ? (
+        <p className="rounded-lg border-2 border-brand-teal bg-brand-teal/10 px-3 py-2 text-sm text-brand-green">
+          {state.ok}
+        </p>
+      ) : null}
+
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-ink">Nombre</span>
+        <input
+          name="label"
+          required
+          maxLength={200}
+          placeholder="Vela aromática mediana"
+          className={inputClass}
+        />
+      </label>
+
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-ink">Categoría</span>
+          <input
+            name="category"
+            list="new-item-categories"
+            placeholder="Otros"
+            className={inputClass}
+          />
+          <datalist id="new-item-categories">
+            {categories.map((c) => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm font-medium text-ink">Unidad</span>
+          <input
+            name="unit"
+            list="new-item-units"
+            placeholder="unidad"
+            defaultValue="unidad"
+            className={inputClass}
+          />
+          <datalist id="new-item-units">
+            <option value="unidad" />
+            <option value="libra" />
+            <option value="onza" />
+            <option value="metro" />
+            <option value="paquete" />
+          </datalist>
+        </label>
+      </div>
+
+      <SubmitButton />
+    </form>
+  );
+}
+
+const inputClass =
+  "w-full rounded-lg border-2 border-line bg-surface-raised px-3 py-2 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none";
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="self-start rounded-lg bg-brand-green px-5 py-2 text-base font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+    >
+      {pending ? "Guardando…" : "Agregar insumo"}
+    </button>
+  );
+}

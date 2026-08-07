@@ -89,7 +89,7 @@ export type InventoryPurchase = {
   quantity: number;
   total_cost: number;
   unit_cost: number | null;
-  purchase_type: "mayoreo" | "individual";
+  purchase_type: "mayoreo" | "individual" | "inicial";
   supplier: string | null;
   purchased_at: string;
   notes: string | null;

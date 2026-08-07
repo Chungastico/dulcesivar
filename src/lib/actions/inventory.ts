@@ -70,6 +70,131 @@ export async function registerPurchase(
   return { ok: `Compra registrada. Costo unitario: $${unit.toFixed(2)}` };
 }
 
+// ---------------------------------------------------------------------------
+// Carga inicial: registrar muchos insumos de una vez.
+//
+// Llenar el formulario de "Registrar compra" insumo por insumo no es viable
+// para poblar 74 insumos de arranque. Esta acción recibe un lote entero y lo
+// inserta en una sola operación.
+//
+// Se llama directo desde el cliente (no como <form action>): así se le pasa
+// un arreglo tipado en vez de tener que codificar N filas en un FormData con
+// nombres tipo quantity[3], cost[3], que sería más frágil de parsear.
+//
+// Cada fila sigue siendo su propia compra (mismo esquema que registerPurchase,
+// una por insumo): no existe manera de que esto termine como una sola compra
+// gigante que mezcle artículos, porque inventory_purchases exige un item_id
+// por fila. El tipo "inicial" es lo que las distingue de una compra real a un
+// proveedor en cualquier reporte futuro.
+// ---------------------------------------------------------------------------
+
+const bulkRowSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: z.coerce.number().positive().max(1_000_000),
+  totalCost: z.coerce.number().min(0).max(1_000_000),
+});
+
+const bulkMetaSchema = z.object({
+  purchasedAt: z.string().trim().min(1, "Falta la fecha"),
+  purchaseType: z.enum(["inicial", "mayoreo", "individual"]).default("inicial"),
+  supplier: z.string().trim().max(120).optional(),
+  notes: z.string().trim().max(500).optional(),
+});
+
+export type BulkRow = { itemId: string; quantity: string; totalCost: string };
+export type BulkMeta = {
+  purchasedAt: string;
+  purchaseType?: "inicial" | "mayoreo" | "individual";
+  supplier?: string;
+  notes?: string;
+};
+export type BulkResult = { error?: string; ok?: string; saved?: number; skipped?: number };
+
+export async function bulkRegisterInventory(
+  rows: BulkRow[],
+  meta: BulkMeta,
+): Promise<BulkResult> {
+  await requireAdmin();
+
+  const parsedMeta = bulkMetaSchema.safeParse(meta);
+  if (!parsedMeta.success) return { error: parsedMeta.error.issues[0].message };
+
+  // Solo cuentan las filas donde ella escribió cantidad Y costo. Una fila con
+  // cantidad pero sin costo se descarta en vez de guardarse en $0: un costo
+  // inventado a la baja arrastraría el promedio ponderado de ese insumo hacia
+  // abajo y mentiría en el margen de cada regalo que lo use.
+  const candidates = rows.filter(
+    (r) => r.quantity.trim() !== "" && r.totalCost.trim() !== "",
+  );
+  const skipped = rows.length - candidates.length;
+
+  if (candidates.length === 0) {
+    return {
+      error:
+        skipped > 0
+          ? "Ninguna fila tiene cantidad y costo juntos. Ambos son necesarios para registrar el insumo."
+          : "No hay insumos que registrar.",
+    };
+  }
+
+  const validated = candidates.map((r) => bulkRowSchema.safeParse(r));
+  const bad = validated.find((v) => !v.success);
+  if (bad && !bad.success) {
+    return { error: `Revisa los números: ${bad.error.issues[0].message}` };
+  }
+
+  const good = validated
+    .filter((v): v is { success: true; data: z.infer<typeof bulkRowSchema> } => v.success)
+    .map((v) => v.data);
+
+  const payload = good.map((row) => ({
+    item_id: row.itemId,
+    quantity: row.quantity,
+    total_cost: row.totalCost,
+    purchase_type: parsedMeta.data.purchaseType,
+    supplier: parsedMeta.data.supplier ?? null,
+    purchased_at: parsedMeta.data.purchasedAt,
+    notes: parsedMeta.data.notes ?? "Carga inicial de inventario",
+  }));
+
+  const { error } = await supabaseAdmin().from("inventory_purchases").insert(payload);
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/catalogo");
+
+  return {
+    ok: `${good.length} insumo${good.length === 1 ? "" : "s"} registrado${good.length === 1 ? "" : "s"}${
+      skipped > 0 ? `. ${skipped} sin cantidad+costo se omitieron.` : "."
+    }`,
+    saved: good.length,
+    skipped,
+  };
+}
+
+/**
+ * Borra TODAS las compras registradas (incluida la carga inicial) para
+ * empezar de cero. No toca los insumos de la biblioteca ni el catálogo, solo
+ * el historial de compras del que sale el costo promedio.
+ */
+export async function resetInventory(): Promise<BulkResult> {
+  await requireAdmin();
+
+  const { error, count } = await supabaseAdmin()
+    .from("inventory_purchases")
+    .delete({ count: "exact" })
+    // Supabase exige un filtro explícito; este coincide con toda fila real,
+    // ya que "id" nunca es NULL.
+    .not("id", "is", null);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/catalogo");
+
+  return { ok: `Inventario vaciado: se borraron ${count ?? 0} compras.` };
+}
+
 export async function deletePurchase(purchaseId: string) {
   await requireAdmin();
 
