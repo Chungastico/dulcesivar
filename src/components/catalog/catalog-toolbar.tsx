@@ -36,7 +36,7 @@ export function CatalogToolbar({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-surface-raised p-3">
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-3 sm:flex-row sm:flex-wrap sm:items-center">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -45,7 +45,7 @@ export function CatalogToolbar({
             else p.delete(QUERY_PARAM);
           });
         }}
-        className="flex min-w-56 flex-1 items-center gap-2"
+        className="flex w-full items-center gap-2 sm:min-w-64 sm:flex-1"
       >
         <input
           value={draft}
@@ -56,12 +56,13 @@ export function CatalogToolbar({
         />
         <button
           type="submit"
-          className="rounded-lg bg-brand-green px-4 py-2.5 text-base font-medium text-white transition hover:opacity-90"
+          className="shrink-0 rounded-lg bg-brand-green px-4 py-2.5 text-base font-medium text-white transition hover:opacity-90"
         >
           Buscar
         </button>
       </form>
 
+      <div className="flex items-center justify-between gap-3 sm:contents">
       <p className="text-base text-ink-muted">
         {shown === total ? (
           <>
@@ -75,7 +76,7 @@ export function CatalogToolbar({
       </p>
 
       <label className="flex items-center gap-2 text-base text-ink-muted">
-        Ordenar por
+        <span className="hidden sm:inline">Ordenar por</span>
         <select
           value={sort}
           onChange={(e) =>
@@ -93,6 +94,7 @@ export function CatalogToolbar({
           ))}
         </select>
       </label>
+      </div>
     </div>
   );
 }

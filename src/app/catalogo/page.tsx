@@ -76,15 +76,16 @@ export default async function CatalogoPage({
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[16rem_1fr]">
-        <aside className="rounded-2xl border border-line bg-surface-raised p-4 lg:sticky lg:top-6">
+        <div className="lg:sticky lg:top-6">
           <FilterSidebar
             groups={groups}
             filters={filters}
             counts={counts}
             priceBounds={priceBounds}
             total={products.length}
+            shown={visible.length}
           />
-        </aside>
+        </div>
 
         <div className="flex flex-col gap-5">
           <CatalogToolbar

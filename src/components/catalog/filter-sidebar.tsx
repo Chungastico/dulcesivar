@@ -4,6 +4,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import {
+  activeFilterCount,
   PRICE_MAX_PARAM,
   PRICE_MIN_PARAM,
   QUERY_PARAM,
@@ -17,7 +18,7 @@ import type { AttributeGroupWithValues } from "@/lib/supabase/types";
  * Todo vive en la URL, no en estado local: es lo que permite que un enlace ya
  * filtrado se comparta por WhatsApp y abra exactamente la misma vista.
  */
-export function FilterSidebar({
+function FilterControls({
   groups,
   filters,
   counts,
@@ -29,6 +30,7 @@ export function FilterSidebar({
   counts: Map<string, number>;
   priceBounds: { min: number; max: number };
   total: number;
+  shown?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -84,17 +86,20 @@ export function FilterSidebar({
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-base font-semibold text-brand-green">Filtros</h2>
+        {/* En móvil el título ya lo pone la cabecera del panel. */}
+        <h2 className="hidden text-base font-semibold text-brand-green lg:block">
+          Filtros
+        </h2>
         {hasFacets ? (
           <button
             type="button"
             onClick={clearAll}
-            className="text-sm text-ink-muted underline transition hover:text-brand-green"
+            className="ml-auto text-sm text-ink-muted underline transition hover:text-brand-green"
           >
             Limpiar todo
           </button>
         ) : (
-          <span className="text-sm text-ink-muted">{total} regalos</span>
+          <span className="ml-auto text-sm text-ink-muted">{total} regalos</span>
         )}
       </div>
 
@@ -191,3 +196,102 @@ export function FilterSidebar({
 
 const priceInput =
   "w-full min-w-0 rounded-lg border-2 border-line bg-surface-raised px-2.5 py-2 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none";
+
+/**
+ * Presentación responsiva de los filtros.
+ *
+ * En escritorio son una columna fija. En móvil no pueden serlo: apilados
+ * medían 1546 px y empujaban el primer producto a 1864 px, o sea más de dos
+ * pantallas de scroll antes de ver un solo regalo. Ahí pasan a un panel que se
+ * abre sobre el contenido, con los productos visibles de entrada.
+ */
+export function FilterSidebar(props: {
+  groups: AttributeGroupWithValues[];
+  filters: Filters;
+  counts: Map<string, number>;
+  priceBounds: { min: number; max: number };
+  total: number;
+  shown: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const active = activeFilterCount(props.filters);
+
+  return (
+    <>
+      {/* Barra de acceso, solo en móvil */}
+      <div className="lg:hidden">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-line bg-surface-raised px-4 py-3 text-base font-medium text-ink transition hover:border-brand-teal"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden
+          >
+            <path d="M3 6h18M7 12h10M11 18h2" />
+          </svg>
+          Filtros
+          {active > 0 ? (
+            <span className="rounded-full bg-brand-green px-2 py-0.5 text-sm font-semibold text-white">
+              {active}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      {open ? (
+        <button
+          type="button"
+          aria-label="Cerrar filtros"
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-40 bg-ink/50 lg:hidden"
+        />
+      ) : null}
+
+      {/* Panel sobre el contenido en móvil; columna fija en escritorio.
+          La visibilidad se controla con display y no con translate: la clase
+          condicional de translate no ganaba sobre la variante lg y el panel se
+          quedaba fuera de pantalla aunque estuviera "abierto". Se pierde el
+          deslizamiento, que era decorativo. */}
+      <aside
+        className={`${
+          open ? "flex" : "hidden"
+        } fixed inset-y-0 left-0 z-50 w-[88%] max-w-sm flex-col bg-surface-raised shadow-2xl lg:flex lg:static lg:z-auto lg:w-auto lg:max-w-none lg:rounded-2xl lg:border lg:border-line lg:shadow-none`}
+      >
+        <div className="flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
+          <span className="text-base font-semibold text-brand-green">
+            Filtros
+          </span>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Cerrar filtros"
+            className="rounded-lg px-2 py-1 text-lg text-ink-muted hover:bg-brand-cream/50"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          <FilterControls {...props} />
+        </div>
+
+        <div className="border-t border-line p-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="w-full rounded-xl bg-brand-green px-4 py-3 text-base font-semibold text-white"
+          >
+            Ver {props.shown} resultado{props.shown === 1 ? "" : "s"}
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
