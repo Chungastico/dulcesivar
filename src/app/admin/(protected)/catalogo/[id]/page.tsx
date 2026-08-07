@@ -22,7 +22,7 @@ export default async function EditProductPage({
   const { id } = await params;
 
   const db = supabaseAdmin();
-  const [productResult, groupsResult] = await Promise.all([
+  const [productResult, groupsResult, presetsResult] = await Promise.all([
     db
       .from("products")
       .select("*, product_contents(*), product_images(*), product_attributes(value_id)")
@@ -32,6 +32,12 @@ export default async function EditProductPage({
       .from("attribute_groups")
       .select("*, attribute_values(*)")
       .eq("is_active", true)
+      .order("sort_order"),
+    db
+      .from("content_presets")
+      .select("*")
+      .eq("is_active", true)
+      .order("category")
       .order("sort_order"),
   ]);
 
@@ -48,7 +54,7 @@ export default async function EditProductPage({
   const publicUrlBase = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
 
   return (
-    <div className="flex max-w-2xl flex-col gap-8">
+    <div className="flex max-w-3xl flex-col gap-6">
       <div>
         <Link
           href="/admin/catalogo"
@@ -69,6 +75,8 @@ export default async function EditProductPage({
       <ProductForm
         action={updateProduct.bind(null, product.id)}
         groups={groupsResult.data ?? []}
+        presets={presetsResult.data ?? []}
+        existingImages={images.length}
         submitLabel="Guardar cambios"
         initial={{
           name: product.name,

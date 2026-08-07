@@ -69,6 +69,17 @@ export type ProductImage = {
   created_at: string;
 };
 
+/** Insumo reutilizable de la biblioteca ("Chocolates Ferrero Rocher"). */
+export type ContentPreset = {
+  id: string;
+  label: string;
+  category: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ProductAttribute = {
   product_id: string;
   value_id: string;
@@ -106,6 +117,7 @@ export type Database = {
   public: {
     Tables: {
       attribute_groups: Table<AttributeGroup>;
+      content_presets: Table<ContentPreset>;
       attribute_values: Table<
         AttributeValue,
         [

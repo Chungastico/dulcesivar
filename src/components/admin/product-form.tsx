@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { ContentsEditor, type ContentItem } from "@/components/admin/contents-editor";
 import type { ActionState } from "@/lib/actions/products";
-import { parseContentList } from "@/lib/parse-contents";
 import { slugify } from "@/lib/slug";
-import type { AttributeGroupWithValues } from "@/lib/supabase/types";
+import type {
+  AttributeGroupWithValues,
+  ContentPreset,
+} from "@/lib/supabase/types";
 
 export type ProductFormValues = {
   name: string;
@@ -17,7 +20,7 @@ export type ProductFormValues = {
   is_active: boolean;
   is_featured: boolean;
   valueIds: string[];
-  contents: { label: string; quantity: number }[];
+  contents: ContentItem[];
 };
 
 const EMPTY: ProductFormValues = {
@@ -34,162 +37,186 @@ const EMPTY: ProductFormValues = {
 export function ProductForm({
   action,
   groups,
+  presets,
   initial = EMPTY,
   submitLabel = "Guardar producto",
+  existingImages = 0,
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   groups: AttributeGroupWithValues[];
+  presets: ContentPreset[];
   initial?: ProductFormValues;
   submitLabel?: string;
+  /** Imágenes ya guardadas: si hay, subir una nueva deja de ser obligatorio. */
+  existingImages?: number;
 }) {
   const [state, formAction] = useActionState(action, {});
 
   const [name, setName] = useState(initial.name);
-  const [slug, setSlug] = useState(initial.slug);
-  // Al crear, el slug sigue al nombre. En cuanto se edita a mano, deja de
-  // hacerlo: cambiar el slug de un producto publicado rompe los links ya
-  // compartidos, así que nunca se toca solo.
-  const [slugLocked, setSlugLocked] = useState(initial.slug !== "");
   const [contents, setContents] = useState(initial.contents);
+  const [newImages, setNewImages] = useState(0);
 
-  const effectiveSlug = slugLocked ? slug : slugify(name);
+  // El slug se deriva del nombre y nunca se muestra como campo editable: es
+  // jerga técnica. En un producto ya publicado se congela, porque cambiarlo
+  // rompería los links que ya se compartieron por WhatsApp.
+  const slug = initial.slug || slugify(name);
+  const needsImage = existingImages === 0 && newImages === 0;
 
   return (
-    <form action={formAction} className="flex flex-col gap-6">
+    <form action={formAction} className="flex flex-col gap-5">
       {state.error ? (
-        <p className="rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <p className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
           {state.error}
         </p>
       ) : null}
 
-      <Field label="Nombre" error={state.fieldErrors?.name}>
-        <input
-          name="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+      {/* Datos básicos, en dos columnas para no estirar la página */}
+      <section className="grid gap-4 rounded-xl border border-line bg-surface-raised p-4 sm:grid-cols-2">
+        <Field
+          label="Nombre del regalo"
           required
-          maxLength={200}
-          placeholder="Caja sorpresa de chocolates"
-          className={inputClass}
-        />
-      </Field>
+          error={state.fieldErrors?.name}
+          className="sm:col-span-2"
+        >
+          <input
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+            maxLength={200}
+            placeholder="Morning Box Cumpleaños"
+            className={inputClass}
+          />
+        </Field>
 
-      <Field
-        label="Slug (URL)"
-        error={state.fieldErrors?.slug}
-        hint={`El producto vivirá en /catalogo/${effectiveSlug || "..."}`}
-      >
-        <input
-          name="slug"
-          value={effectiveSlug}
-          onChange={(e) => {
-            setSlugLocked(true);
-            setSlug(e.target.value);
-          }}
-          className={inputClass}
-        />
-      </Field>
+        <Field label="Precio" required error={state.fieldErrors?.price_usd}>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-ink-muted">$</span>
+            <input
+              name="price_usd"
+              type="number"
+              step="0.01"
+              min="0"
+              required
+              defaultValue={initial.price_usd}
+              placeholder="44.00"
+              className={inputClass}
+            />
+          </div>
+        </Field>
 
-      <Field label="Descripción" error={state.fieldErrors?.description}>
-        <textarea
-          name="description"
-          defaultValue={initial.description}
-          rows={4}
-          maxLength={5000}
-          placeholder="Describe el regalo, para quién es y qué lo hace especial."
-          className={inputClass}
-        />
-      </Field>
+        <div className="flex items-end gap-4 pb-1">
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              name="is_active"
+              defaultChecked={initial.is_active}
+              className="size-4"
+            />
+            Publicado
+          </label>
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              name="is_featured"
+              defaultChecked={initial.is_featured}
+              className="size-4"
+            />
+            Destacado
+          </label>
+        </div>
 
-      <Field
-        label="Precio (USD)"
-        error={state.fieldErrors?.price_usd}
-        hint="Obligatorio: es uno de los filtros del catálogo."
-      >
-        <input
-          name="price_usd"
-          type="number"
-          step="0.01"
-          min="0"
+        <Field
+          label="Descripción"
           required
-          defaultValue={initial.price_usd}
-          placeholder="25.00"
-          className={inputClass}
+          error={state.fieldErrors?.description}
+          className="sm:col-span-2"
+        >
+          <textarea
+            name="description"
+            defaultValue={initial.description}
+            rows={2}
+            required
+            maxLength={5000}
+            placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
+            className={inputClass}
+          />
+        </Field>
+
+        {slug ? (
+          <p className="text-xs text-ink-muted sm:col-span-2">
+            Enlace público:{" "}
+            <span className="text-brand-green">/catalogo/{slug}</span>
+          </p>
+        ) : null}
+        <input type="hidden" name="slug" value={slug} />
+      </section>
+
+      <ContentsEditor
+        contents={contents}
+        onChange={setContents}
+        presets={presets}
+        error={state.fieldErrors?.contents}
+      />
+
+      {/* Imágenes */}
+      <section className="flex flex-col gap-2 rounded-xl border border-line bg-surface-raised p-4">
+        <span className="text-sm font-medium text-brand-green">
+          Fotos {existingImages === 0 ? <Req /> : null}
+        </span>
+        <input
+          type="file"
+          name="images"
+          multiple
+          required={needsImage}
+          accept="image/jpeg,image/png,image/webp,image/avif"
+          onChange={(e) => setNewImages(e.target.files?.length ?? 0)}
+          className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-green file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
         />
-      </Field>
+        <p className="text-xs text-ink-muted">
+          {existingImages > 0
+            ? `Ya tiene ${existingImages} foto${existingImages === 1 ? "" : "s"}. Estas se agregan.`
+            : "Al menos una. La primera será la portada."}
+        </p>
+        {state.fieldErrors?.images ? (
+          <p className="text-xs text-red-700">{state.fieldErrors.images}</p>
+        ) : null}
+      </section>
 
-      <ContentsEditor contents={contents} onChange={setContents} />
-      {/* El editor es dinámico: se serializa a JSON en un campo oculto. */}
-      <input type="hidden" name="contents" value={JSON.stringify(contents)} />
-
-      {/* Un fieldset por eje. Marcar en varios es lo normal, no la excepción:
-          de ahí sale la potencia de los filtros combinados del catálogo. */}
-      {groups.map((group) => (
-        <fieldset key={group.id} className="flex flex-col gap-2">
-          <legend className="text-sm font-medium text-brand-green">
-            {group.name}
-          </legend>
-          {group.description ? (
-            <p className="text-xs text-ink-muted">{group.description}</p>
-          ) : null}
-          <div className="mt-1 flex flex-wrap gap-2">
+      {/* Clasificación: chips compactos, un eje por bloque */}
+      <section className="flex flex-col gap-4 rounded-xl border border-line bg-surface-raised p-4">
+        <span className="text-sm font-medium text-brand-green">
+          Clasificación
+        </span>
+        {groups.map((group) => (
+          <fieldset key={group.id} className="flex flex-wrap items-center gap-2">
+            <legend className="sr-only">{group.name}</legend>
+            <span className="w-full text-xs font-medium text-ink-muted sm:w-32 sm:shrink-0">
+              {group.name}
+            </span>
             {group.attribute_values
               .filter((v) => v.is_active)
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((value) => (
                 <label
                   key={value.id}
-                  className="flex items-center gap-2 rounded-full border border-line bg-surface-raised px-3 py-1.5 text-sm text-ink transition has-checked:border-brand-teal has-checked:bg-brand-teal/10 has-checked:font-medium has-checked:text-brand-green"
+                  className="cursor-pointer rounded-full border border-line px-2.5 py-1 text-xs text-ink transition has-checked:border-brand-teal has-checked:bg-brand-teal/15 has-checked:font-medium has-checked:text-brand-green"
                 >
                   <input
                     type="checkbox"
                     name="valueIds"
                     value={value.id}
                     defaultChecked={initial.valueIds.includes(value.id)}
-                    className="size-4"
+                    className="sr-only"
                   />
                   {value.name}
                 </label>
               ))}
-          </div>
-        </fieldset>
-      ))}
+          </fieldset>
+        ))}
+      </section>
 
-      <Field
-        label="Agregar imágenes"
-        hint="JPG, PNG, WebP o AVIF. Máximo 8 MB cada una."
-      >
-        <input
-          type="file"
-          name="images"
-          multiple
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-green file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
-        />
-      </Field>
-
-      <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="is_active"
-            defaultChecked={initial.is_active}
-            className="size-4"
-          />
-          Publicado (visible en el catálogo)
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="is_featured"
-            defaultChecked={initial.is_featured}
-            className="size-4"
-          />
-          Destacado
-        </label>
-      </div>
-
-      <div className="flex items-center gap-3 border-t border-line pt-6">
+      <div className="sticky bottom-0 flex items-center gap-3 border-t border-line bg-surface/95 py-3 backdrop-blur">
         <SubmitButton label={submitLabel} />
         <Link
           href="/admin/catalogo"
@@ -202,148 +229,33 @@ export function ProductForm({
   );
 }
 
-function ContentsEditor({
-  contents,
-  onChange,
-}: {
-  contents: { label: string; quantity: number }[];
-  onChange: (next: { label: string; quantity: number }[]) => void;
-}) {
-  const [pasting, setPasting] = useState(false);
-  const [draft, setDraft] = useState("");
-
-  const update = (i: number, patch: Partial<{ label: string; quantity: number }>) =>
-    onChange(contents.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
-
-  return (
-    <fieldset className="flex flex-col gap-2">
-      <legend className="text-sm font-medium text-brand-green">
-        ¿Qué incluye?
-      </legend>
-      <p className="text-xs text-ink-muted">
-        Los ítems que componen el regalo. Se mostrarán como lista en la ficha.
-      </p>
-
-      <div className="mt-1 flex flex-col gap-2">
-        {contents.map((item, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={999}
-              value={item.quantity}
-              onChange={(e) =>
-                update(i, { quantity: Number(e.target.value) || 1 })
-              }
-              className="w-20 rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink"
-              aria-label={`Cantidad del ítem ${i + 1}`}
-            />
-            <input
-              value={item.label}
-              onChange={(e) => update(i, { label: e.target.value })}
-              placeholder="Chocolates artesanales"
-              className={`flex-1 ${inputClass}`}
-              aria-label={`Nombre del ítem ${i + 1}`}
-            />
-            <button
-              type="button"
-              onClick={() => onChange(contents.filter((_, idx) => idx !== i))}
-              className="rounded-lg px-2 py-2 text-sm text-ink-muted transition hover:bg-red-50 hover:text-red-700"
-              aria-label={`Quitar ítem ${i + 1}`}
-            >
-              Quitar
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange([...contents, { label: "", quantity: 1 }])}
-          className="rounded-lg border border-dashed border-line px-3 py-2 text-sm text-ink-muted transition hover:border-brand-teal hover:text-brand-green"
-        >
-          + Agregar ítem
-        </button>
-        <button
-          type="button"
-          onClick={() => setPasting((v) => !v)}
-          className="rounded-lg border border-dashed border-brand-teal px-3 py-2 text-sm font-medium text-brand-green transition hover:bg-brand-teal/10"
-        >
-          {pasting ? "Cerrar" : "Pegar lista completa"}
-        </button>
-      </div>
-
-      {pasting ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-brand-teal/40 bg-brand-teal/5 p-3">
-          <p className="text-xs text-ink-muted">
-            Pega aquí la lista tal como la tienes (una línea por ítem). Las
-            viñetas se quitan solas y los números del inicio se toman como
-            cantidad: <code>2 libras uva verde</code> queda como 2 ×{" "}
-            <em>libras uva verde</em>.
-          </p>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={6}
-            placeholder={"• 1 Vaso Transparente personalizado\n• 12 rosas\n• 3 chocolates Ferrero"}
-            className="w-full rounded-lg border border-line bg-surface-raised px-3 py-2 font-mono text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none"
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={!draft.trim()}
-              onClick={() => {
-                onChange([...contents, ...parseContentList(draft)]);
-                setDraft("");
-                setPasting(false);
-              }}
-              className="rounded-lg bg-brand-green px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-40"
-            >
-              Agregar {parseContentList(draft).length || ""} ítems
-            </button>
-            <button
-              type="button"
-              disabled={!draft.trim()}
-              onClick={() => {
-                onChange(parseContentList(draft));
-                setDraft("");
-                setPasting(false);
-              }}
-              className="rounded-lg border border-line bg-surface-raised px-3 py-1.5 text-sm text-ink-muted transition hover:bg-brand-cream/40 disabled:opacity-40"
-            >
-              Reemplazar todo
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </fieldset>
-  );
-}
-
 const inputClass =
-  "w-full rounded-lg border border-line bg-surface-raised px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/30";
+  "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none focus:ring-2 focus:ring-brand-teal/25";
+
+function Req() {
+  return <span className="text-brand-orange">*</span>;
+}
 
 function Field({
   label,
-  hint,
+  required,
   error,
+  className = "",
   children,
 }: {
   label: string;
-  hint?: string;
+  required?: boolean;
   error?: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium text-brand-green">{label}</span>
+    <label className={`flex flex-col gap-1.5 ${className}`}>
+      <span className="text-sm font-medium text-brand-green">
+        {label} {required ? <Req /> : null}
+      </span>
       {children}
-      {error ? (
-        <span className="text-xs text-red-700">{error}</span>
-      ) : hint ? (
-        <span className="text-xs text-ink-muted">{hint}</span>
-      ) : null}
+      {error ? <span className="text-xs text-red-700">{error}</span> : null}
     </label>
   );
 }
@@ -354,7 +266,7 @@ function SubmitButton({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-lg bg-brand-green px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+      className="rounded-lg bg-brand-green px-5 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
     >
       {pending ? "Guardando…" : label}
     </button>

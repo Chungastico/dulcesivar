@@ -14,14 +14,23 @@ export const metadata: Metadata = {
 export default async function NewProductPage() {
   await requireAdmin();
 
-  const { data: groups } = await supabaseAdmin()
-    .from("attribute_groups")
-    .select("*, attribute_values(*)")
-    .eq("is_active", true)
-    .order("sort_order");
+  const db = supabaseAdmin();
+  const [groupsResult, presetsResult] = await Promise.all([
+    db
+      .from("attribute_groups")
+      .select("*, attribute_values(*)")
+      .eq("is_active", true)
+      .order("sort_order"),
+    db
+      .from("content_presets")
+      .select("*")
+      .eq("is_active", true)
+      .order("category")
+      .order("sort_order"),
+  ]);
 
   return (
-    <div className="flex max-w-2xl flex-col gap-6">
+    <div className="flex max-w-3xl flex-col gap-6">
       <div>
         <Link
           href="/admin/catalogo"
@@ -34,7 +43,11 @@ export default async function NewProductPage() {
         </h1>
       </div>
 
-      <ProductForm action={createProduct} groups={groups ?? []} />
+      <ProductForm
+        action={createProduct}
+        groups={groupsResult.data ?? []}
+        presets={presetsResult.data ?? []}
+      />
     </div>
   );
 }

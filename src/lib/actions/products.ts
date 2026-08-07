@@ -37,7 +37,11 @@ const productSchema = z.object({
       /^[a-z0-9]+(-[a-z0-9]+)*$/,
       "El slug solo admite minúsculas, números y guiones",
     ),
-  description: z.string().trim().max(5000).nullable(),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Escribe una descripción de al menos 10 caracteres")
+    .max(5000),
   // Obligatorio: el precio es uno de los filtros del catálogo, y un producto
   // sin precio quedaría invisible en cualquier búsqueda por presupuesto.
   // La columna sigue aceptando NULL en la base a propósito, para poder añadir
@@ -49,7 +53,12 @@ const productSchema = z.object({
   is_active: z.boolean(),
   is_featured: z.boolean(),
   valueIds: z.array(z.string().uuid()),
-  contents: z.array(contentItemSchema).max(50),
+  // Al menos un ítem: un regalo sin "qué incluye" no le sirve a nadie que lo
+  // esté comparando en el catálogo.
+  contents: z
+    .array(contentItemSchema)
+    .min(1, "Agrega al menos un ítem de lo que incluye")
+    .max(50),
 });
 
 /** Traduce el FormData crudo a algo que zod pueda validar. */
@@ -70,7 +79,7 @@ function parseProductForm(formData: FormData) {
     name: rawName,
     // Si el usuario deja el slug vacío, se deriva del nombre.
     slug: rawSlug ? slugify(rawSlug) : slugify(rawName),
-    description: rawDescription || null,
+    description: rawDescription,
     price_usd: String(formData.get("price_usd") ?? "").trim(),
     is_active: formData.get("is_active") === "on",
     is_featured: formData.get("is_featured") === "on",
@@ -195,6 +204,17 @@ export async function createProduct(
     return { error: "Revisa los campos marcados.", fieldErrors: flattenErrors(parsed.error) };
   }
 
+  const files = formData
+    .getAll("images")
+    .filter((f): f is File => f instanceof File && f.size > 0);
+
+  if (files.length === 0) {
+    return {
+      error: "Falta la foto del producto.",
+      fieldErrors: { images: "Sube al menos una imagen." },
+    };
+  }
+
   const db = supabaseAdmin();
   const { data, error } = await db
     .from("products")
@@ -211,7 +231,6 @@ export async function createProduct(
 
   if (error) return { error: duplicateSlugMessage(error) };
 
-  const files = formData.getAll("images").filter((f): f is File => f instanceof File);
   const relationError = await saveRelations(db, data.id, parsed.data, files);
 
   if (relationError) {
