@@ -16,10 +16,10 @@ export type ContentItem = {
 /**
  * Editor de "¿Qué incluye?".
  *
- * Los ítems se repiten entre productos casi siempre, así que el camino rápido
- * es elegir de la biblioteca; escribir libre queda para lo excepcional. Eso
- * además evita que el mismo artículo entre como "Ferrero", "ferrero" y
- * "Chocolate Ferrero", que luego rompe cualquier conteo.
+ * El buscador va arriba y se queda ahí: la lista crece hacia abajo, así que
+ * agregar diez ítems no aleja el campo donde se agrega el once. Elegir de la
+ * biblioteca además guarda el enlace al insumo, que es lo que después permite
+ * costear la caja.
  */
 export function ContentsEditor({
   contents,
@@ -56,16 +56,6 @@ export function ContentsEditor({
       .slice(0, 6);
   }, [query, presets, contents]);
 
-  const byCategory = useMemo(() => {
-    const map = new Map<string, ContentPreset[]>();
-    for (const p of presets) {
-      const list = map.get(p.category) ?? [];
-      list.push(p);
-      map.set(p.category, list);
-    }
-    return [...map.entries()];
-  }, [presets]);
-
   return (
     <fieldset className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -77,42 +67,9 @@ export function ContentsEditor({
         </span>
       </div>
 
-      {contents.length > 0 ? (
-        <ul className="flex flex-col gap-1.5">
-          {contents.map((item, i) => (
-            <li key={i} className="flex items-center gap-2">
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={item.quantity}
-                onChange={(e) =>
-                  update(i, { quantity: Number(e.target.value) || 1 })
-                }
-                aria-label={`Cantidad del ítem ${i + 1}`}
-                className="w-20 rounded-lg border-2 border-line bg-surface-raised px-2 py-2.5 text-center text-base font-medium text-ink"
-              />
-              <input
-                value={item.label}
-                onChange={(e) => update(i, { label: e.target.value })}
-                aria-label={`Nombre del ítem ${i + 1}`}
-                className="flex-1 rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink"
-              />
-              <button
-                type="button"
-                onClick={() => onChange(contents.filter((_, x) => x !== i))}
-                aria-label={`Quitar ítem ${i + 1}`}
-                className="rounded-lg border-2 border-transparent px-3 py-2 text-base text-ink-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
-      {/* Buscador con autocompletado sobre la biblioteca */}
-      <div className="relative">
+      {/* Buscador anclado arriba. El desplegable se superpone a la lista en vez
+          de empujarla, para que la posición del campo no cambie nunca. */}
+      <div className="relative z-10">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -129,7 +86,7 @@ export function ContentsEditor({
         />
 
         {query.trim() ? (
-          <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border-2 border-line bg-surface-raised shadow-xl">
+          <ul className="absolute mt-1 w-full overflow-hidden rounded-lg border-2 border-line bg-surface-raised shadow-xl">
             {matches.map((m) => (
               <li key={m.id}>
                 <button
@@ -155,7 +112,7 @@ export function ContentsEditor({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div>
         <button
           type="button"
           onClick={() => setPasting((v) => !v)}
@@ -207,27 +164,48 @@ export function ContentsEditor({
         </div>
       ) : null}
 
-      {/* Los más usados, a un clic, sin tener que escribir nada. */}
-      {contents.length === 0 && byCategory.length > 0 ? (
-        <div className="flex flex-col gap-3 border-t border-line-soft pt-4">
-          <p className="text-sm font-medium text-ink">O elige de los más comunes:</p>
-          {byCategory.slice(0, 3).map(([category, items]) => (
-            <div key={category} className="flex flex-wrap items-center gap-1.5">
-              <span className="w-full text-sm text-ink-muted sm:w-28 sm:shrink-0">{category}</span>
-              {items.slice(0, 5).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => add(item.label, item.id)}
-                  className="rounded-lg border-2 border-line bg-surface-raised px-3 py-1.5 text-base text-ink transition hover:border-brand-teal hover:bg-brand-teal/15"
-                >
-                  + {item.label}
-                </button>
-              ))}
-            </div>
+      {contents.length > 0 ? (
+        <ul className="flex flex-col gap-1.5 border-t border-line-soft pt-3">
+          {contents.map((item, i) => (
+            <li key={i} className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={item.quantity}
+                onChange={(e) =>
+                  update(i, { quantity: Number(e.target.value) || 1 })
+                }
+                aria-label={`Cantidad del ítem ${i + 1}`}
+                className="w-20 rounded-lg border-2 border-line bg-surface-raised px-2 py-2.5 text-center text-base font-medium text-ink"
+              />
+              <input
+                value={item.label}
+                onChange={(e) =>
+                  // Editar el texto a mano lo desliga del insumo: ya deja de ser
+                  // "ese" artículo de la biblioteca, y costearlo como tal daría
+                  // un número equivocado.
+                  update(i, { label: e.target.value, presetId: null })
+                }
+                aria-label={`Nombre del ítem ${i + 1}`}
+                className="flex-1 rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(contents.filter((_, x) => x !== i))}
+                aria-label={`Quitar ítem ${i + 1}`}
+                className="rounded-lg border-2 border-transparent px-3 py-2 text-base text-ink-muted transition hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+              >
+                ✕
+              </button>
+            </li>
           ))}
-        </div>
-      ) : null}
+        </ul>
+      ) : (
+        <p className="border-t border-line-soft pt-3 text-sm text-ink-muted">
+          Busca arriba para agregar lo que trae la caja.
+        </p>
+      )}
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
       <input type="hidden" name="contents" value={JSON.stringify(contents)} />

@@ -13,6 +13,7 @@ import { ImagePicker } from "@/components/admin/image-picker";
 import { PhotoRail } from "@/components/admin/photo-rail";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { suggestDescription } from "@/lib/actions/describe-image";
+import { suggestTags } from "@/lib/actions/suggest-tags";
 import type { ActionState } from "@/lib/actions/products";
 import { downscaleToDataUrl } from "@/lib/downscale-image";
 import { slugify } from "@/lib/slug";
@@ -82,6 +83,9 @@ export function ProductForm({
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [stepError, setStepError] = useState<string | null>(null);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [tagPicks, setTagPicks] = useState<Record<string, string[]> | null>(null);
+  const [taggingBusy, setTaggingBusy] = useState(false);
+  const [tagError, setTagError] = useState<string | null>(null);
 
   // Las object URLs viven aquí y no en el selector, porque el panel lateral
   // también las usa. Se liberan al cambiar de selección o al desmontar; si no,
@@ -147,6 +151,34 @@ export function ProductForm({
       setSuggestError("No se pudo leer la imagen.");
     } finally {
       setSuggesting(false);
+    }
+  }
+
+  async function handleSuggestTags() {
+    const file = files?.[0];
+    if (!file) return;
+    setTaggingBusy(true);
+    setTagError(null);
+    try {
+      const dataUrl = await downscaleToDataUrl(file);
+      // Se manda solo lo que el modelo necesita para elegir; el resto de la
+      // taxonomía (ids, orden, fechas) no le aporta y encarece la llamada.
+      const result = await suggestTags(
+        dataUrl,
+        groups.map((g) => ({
+          slug: g.slug,
+          name: g.name,
+          values: g.attribute_values
+            .filter((v) => v.is_active)
+            .map((v) => ({ slug: v.slug, name: v.name })),
+        })),
+      );
+      if (result.error) setTagError(result.error);
+      else setTagPicks(result.picked ?? {});
+    } catch {
+      setTagError("No se pudo leer la imagen.");
+    } finally {
+      setTaggingBusy(false);
     }
   }
 
@@ -301,7 +333,17 @@ export function ProductForm({
           </div>
 
           <div className={step === 4 ? "" : "hidden"}>
-            <TagPicker groups={groups} initialIds={initial.valueIds} />
+            <TagPicker
+          groups={groups}
+          initialIds={initial.valueIds}
+          suggestion={{
+            picked: tagPicks,
+            loading: taggingBusy,
+            error: tagError,
+            available: (files?.length ?? 0) > 0,
+            onRequest: handleSuggestTags,
+          }}
+        />
           </div>
         </div>
 
