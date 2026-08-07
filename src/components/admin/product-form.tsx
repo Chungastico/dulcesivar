@@ -5,6 +5,8 @@ import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import { ContentsEditor, type ContentItem } from "@/components/admin/contents-editor";
+import { suggestDescription } from "@/lib/actions/describe-image";
+import { downscaleToDataUrl } from "@/lib/downscale-image";
 import type { ActionState } from "@/lib/actions/products";
 import { slugify } from "@/lib/slug";
 import type {
@@ -55,11 +57,35 @@ export function ProductForm({
   const [name, setName] = useState(initial.name);
   const [contents, setContents] = useState(initial.contents);
   const [newImages, setNewImages] = useState(0);
+  const [description, setDescription] = useState(initial.description);
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   // El slug se deriva del nombre y nunca se muestra como campo editable: es
   // jerga técnica. En un producto ya publicado se congela, porque cambiarlo
   // rompería los links que ya se compartieron por WhatsApp.
   const slug = initial.slug || slugify(name);
+
+  // Sugerir descripción a partir de la primera foto elegida. La respuesta
+  // rellena el campo pero queda editable: es su catálogo y el tono lo pone ella.
+  async function handleSuggest() {
+    const file = files?.[0];
+    if (!file) return;
+
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const dataUrl = await downscaleToDataUrl(file);
+      const result = await suggestDescription(dataUrl);
+      if (result.description) setDescription(result.description);
+      else setSuggestError(result.error ?? "No se pudo generar la descripción.");
+    } catch {
+      setSuggestError("No se pudo leer la imagen.");
+    } finally {
+      setSuggesting(false);
+    }
+  }
   const needsImage = existingImages === 0 && newImages === 0;
 
   return (
@@ -134,13 +160,36 @@ export function ProductForm({
         >
           <textarea
             name="description"
-            defaultValue={initial.description}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
             rows={2}
             required
             maxLength={5000}
             placeholder="Una caja para empezar el día con dulce, ideal para sorprender en la mañana."
             className={inputClass}
           />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSuggest}
+              disabled={!files?.length || suggesting}
+              title={
+                files?.length
+                  ? "Genera una sugerencia a partir de la primera foto"
+                  : "Elige una foto abajo para poder sugerir"
+              }
+              className="rounded-lg border border-brand-teal px-2.5 py-1 text-xs font-medium text-brand-green transition hover:bg-brand-teal/10 disabled:cursor-not-allowed disabled:border-line disabled:text-ink-muted"
+            >
+              {suggesting ? "Generando…" : "✨ Sugerir desde la foto"}
+            </button>
+            {suggestError ? (
+              <span className="text-xs text-red-700">{suggestError}</span>
+            ) : (
+              <span className="text-xs text-ink-muted">
+                La sugerencia es editable; revísala antes de guardar.
+              </span>
+            )}
+          </div>
         </Field>
 
         {slug ? (
@@ -170,7 +219,10 @@ export function ProductForm({
           multiple
           required={needsImage}
           accept="image/jpeg,image/png,image/webp,image/avif"
-          onChange={(e) => setNewImages(e.target.files?.length ?? 0)}
+          onChange={(e) => {
+            setFiles(e.target.files);
+            setNewImages(e.target.files?.length ?? 0);
+          }}
           className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand-green file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:opacity-90"
         />
         <p className="text-xs text-ink-muted">
