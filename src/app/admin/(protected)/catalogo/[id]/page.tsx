@@ -49,7 +49,7 @@ export default async function EditProductPage({
   );
   const contents = [...product.product_contents]
     .sort((a, b) => a.sort_order - b.sort_order)
-    .map((c) => ({ label: c.label, quantity: c.quantity }));
+    .map((c) => ({ label: c.label, quantity: c.quantity, presetId: c.preset_id }));
 
   const publicUrlBase = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
 

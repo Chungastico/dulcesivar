@@ -57,6 +57,7 @@ export type ProductContent = {
   label: string;
   quantity: number;
   sort_order: number;
+  preset_id: string | null;
 };
 
 export type ProductImage = {
@@ -74,10 +75,50 @@ export type ContentPreset = {
   id: string;
   label: string;
   category: string;
+  unit: string;
   sort_order: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+};
+
+/** Una compra de insumo. El unitario lo calcula la base. */
+export type InventoryPurchase = {
+  id: string;
+  item_id: string;
+  quantity: number;
+  total_cost: number;
+  unit_cost: number | null;
+  purchase_type: "mayoreo" | "individual";
+  supplier: string | null;
+  purchased_at: string;
+  notes: string | null;
+  created_at: string;
+};
+
+/** Vista: costo promedio ponderado por insumo. */
+export type InventoryStatus = {
+  id: string;
+  label: string;
+  category: string;
+  unit: string;
+  is_active: boolean;
+  total_quantity: number;
+  total_invested: number;
+  avg_unit_cost: number | null;
+  purchase_count: number;
+  last_purchase_at: string | null;
+};
+
+/** Vista: costo estimado y margen por producto. */
+export type ProductCost = {
+  product_id: string;
+  name: string;
+  price_usd: number | null;
+  total_items: number;
+  costed_items: number;
+  estimated_cost: number;
+  estimated_margin: number | null;
 };
 
 export type ProductAttribute = {
@@ -96,11 +137,20 @@ type Relationship = {
   referencedColumns: string[];
 };
 
-type Table<Row, Rels extends Relationship[] = []> = {
+/**
+ * `Computed` son columnas que Postgres calcula solas (GENERATED ALWAYS): no
+ * solo son opcionales al insertar, es que mandarlas hace fallar la escritura.
+ * Por eso se excluyen de Insert y de Update en vez de volverse opcionales.
+ */
+type Table<
+  Row,
+  Rels extends Relationship[] = [],
+  Computed extends keyof Row = never,
+> = {
   Row: Row;
-  Insert: Omit<Row, Generated & keyof Row> &
+  Insert: Omit<Row, (Generated & keyof Row) | Computed> &
     Partial<Pick<Row, Generated & keyof Row>>;
-  Update: Partial<Row>;
+  Update: Partial<Omit<Row, Computed>>;
   Relationships: Rels;
 };
 
@@ -118,6 +168,20 @@ export type Database = {
     Tables: {
       attribute_groups: Table<AttributeGroup>;
       content_presets: Table<ContentPreset>;
+      inventory_purchases: Table<
+        InventoryPurchase,
+        [
+          {
+            foreignKeyName: "inventory_purchases_item_id_fkey";
+            columns: ["item_id"];
+            isOneToOne: false;
+            referencedRelation: "content_presets";
+            referencedColumns: ["id"];
+          },
+        ],
+        // La calcula Postgres a partir de total_cost / quantity.
+        "unit_cost"
+      >;
       attribute_values: Table<
         AttributeValue,
         [
@@ -150,7 +214,10 @@ export type Database = {
         ]
       >;
     };
-    Views: Record<string, never>;
+    Views: {
+      inventory_status: { Row: InventoryStatus; Relationships: [] };
+      product_costs: { Row: ProductCost; Relationships: [] };
+    };
     Functions: Record<string, never>;
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

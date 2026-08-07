@@ -5,7 +5,13 @@ import { useMemo, useState } from "react";
 import { parseContentList } from "@/lib/parse-contents";
 import type { ContentPreset } from "@/lib/supabase/types";
 
-export type ContentItem = { label: string; quantity: number };
+export type ContentItem = {
+  label: string;
+  quantity: number;
+  /** Insumo de la biblioteca, si vino de ahí. Null si se escribió libre.
+   *  Es lo que permite calcular el costo del regalo en Inventario. */
+  presetId?: string | null;
+};
 
 /**
  * Editor de "¿Qué incluye?".
@@ -33,8 +39,8 @@ export function ContentsEditor({
   const update = (i: number, patch: Partial<ContentItem>) =>
     onChange(contents.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
-  const add = (label: string) => {
-    onChange([...contents, { label, quantity: 1 }]);
+  const add = (label: string, presetId: string | null = null) => {
+    onChange([...contents, { label, quantity: 1, presetId }]);
     setQuery("");
   };
 
@@ -113,8 +119,9 @@ export function ContentsEditor({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              const pick = matches[0]?.label ?? query.trim();
-              if (pick) add(pick);
+              const first = matches[0];
+              if (first) add(first.label, first.id);
+              else if (query.trim()) add(query.trim());
             }
           }}
           placeholder="Escribe para buscar un insumo, o agrega uno nuevo…"
@@ -127,7 +134,7 @@ export function ContentsEditor({
               <li key={m.id}>
                 <button
                   type="button"
-                  onClick={() => add(m.label)}
+                  onClick={() => add(m.label, m.id)}
                   className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-base text-ink hover:bg-brand-teal/15"
                 >
                   {m.label}
@@ -211,7 +218,7 @@ export function ContentsEditor({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => add(item.label)}
+                  onClick={() => add(item.label, item.id)}
                   className="rounded-lg border-2 border-line bg-surface-raised px-3 py-1.5 text-base text-ink transition hover:border-brand-teal hover:bg-brand-teal/15"
                 >
                   + {item.label}

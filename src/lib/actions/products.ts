@@ -26,6 +26,9 @@ export type ActionState = {
 const contentItemSchema = z.object({
   label: z.string().trim().min(1, "El ítem no puede ir vacío").max(200),
   quantity: z.coerce.number().int().min(1).max(999),
+  // Enlace al insumo de la biblioteca. Sin él, el ítem no suma al costo del
+  // regalo en Inventario; se admite null porque no todo se escribe desde ahí.
+  presetId: z.string().uuid().nullish(),
 });
 
 const productSchema = z.object({
@@ -145,6 +148,7 @@ async function saveRelations(
         label: c.label,
         quantity: c.quantity,
         sort_order: i,
+        preset_id: c.presetId ?? null,
       })),
     );
     if (error) return `No se pudo guardar el contenido: ${error.message}`;
