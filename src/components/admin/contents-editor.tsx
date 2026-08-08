@@ -2,14 +2,14 @@
 
 import { useMemo, useState } from "react";
 
-import { parseContentList } from "@/lib/parse-contents";
 import type { ContentPreset } from "@/lib/supabase/types";
 
 export type ContentItem = {
   label: string;
   quantity: number;
-  /** Insumo de la biblioteca, si vino de ahí. Null si se escribió libre.
-   *  Es lo que permite calcular el costo del regalo en Inventario. */
+  /** Insumo de la biblioteca al que está ligado el ítem. Es lo que permite
+   *  calcular el costo del regalo en Inventario. Puede venir null en
+   *  contenido cargado antes de exigir siempre un insumo real. */
   presetId?: string | null;
 };
 
@@ -20,6 +20,13 @@ export type ContentItem = {
  * agregar diez ítems no aleja el campo donde se agrega el once. Elegir de la
  * biblioteca además guarda el enlace al insumo, que es lo que después permite
  * costear la caja.
+ *
+ * Por eso todo ítem sale de la biblioteca: no se puede pegar una lista
+ * completa, escribir uno libre, ni editar el nombre de uno ya puesto. Las
+ * tres rutas dejaban texto suelto sin insumo asociado, y sin ese enlace no
+ * hay forma de rastrear el gasto real de la caja en Inventario. Si el nombre
+ * está mal, se quita el ítem y se agrega de nuevo bien buscado. Si el insumo
+ * todavía no existe, se crea primero en Inventario.
  */
 export function ContentsEditor({
   contents,
@@ -32,14 +39,14 @@ export function ContentsEditor({
   presets: ContentPreset[];
   error?: string;
 }) {
-  const [pasting, setPasting] = useState(false);
-  const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
 
   const update = (i: number, patch: Partial<ContentItem>) =>
     onChange(contents.map((c, idx) => (idx === i ? { ...c, ...patch } : c)));
 
-  const add = (label: string, presetId: string | null = null) => {
+  // Siempre viene de la biblioteca: no hay ruta para agregar texto suelto,
+  // porque un ítem sin insumo real no se puede costear en Inventario.
+  const add = (label: string, presetId: string) => {
     onChange([...contents, { label, quantity: 1, presetId }]);
     setQuery("");
   };
@@ -78,91 +85,36 @@ export function ContentsEditor({
               e.preventDefault();
               const first = matches[0];
               if (first) add(first.label, first.id);
-              else if (query.trim()) add(query.trim());
             }
           }}
-          placeholder="Escribe para buscar un insumo, o agrega uno nuevo…"
+          placeholder="Escribe para buscar un insumo…"
           className="w-full rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none focus:ring-4 focus:ring-brand-teal/20"
         />
 
         {query.trim() ? (
           <ul className="absolute mt-1 w-full overflow-hidden rounded-lg border-2 border-line bg-surface-raised shadow-xl">
-            {matches.map((m) => (
-              <li key={m.id}>
-                <button
-                  type="button"
-                  onClick={() => add(m.label, m.id)}
-                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-base text-ink hover:bg-brand-teal/15"
-                >
-                  {m.label}
-                  <span className="text-sm text-ink-muted">{m.category}</span>
-                </button>
+            {matches.length > 0 ? (
+              matches.map((m) => (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => add(m.label, m.id)}
+                    className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-base text-ink hover:bg-brand-teal/15"
+                  >
+                    {m.label}
+                    <span className="text-sm text-ink-muted">{m.category}</span>
+                  </button>
+                </li>
+              ))
+            ) : (
+              <li className="px-4 py-3 text-sm text-ink-muted">
+                Ningún insumo coincide. Agrégalo primero en Inventario para
+                poder incluirlo aquí.
               </li>
-            ))}
-            <li>
-              <button
-                type="button"
-                onClick={() => add(query.trim())}
-                className="w-full px-4 py-3 text-left text-base font-medium text-brand-green hover:bg-brand-cream/60"
-              >
-                + Agregar «{query.trim()}» como ítem libre
-              </button>
-            </li>
+            )}
           </ul>
         ) : null}
       </div>
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setPasting((v) => !v)}
-          className="rounded-lg border-2 border-dashed border-brand-teal px-3.5 py-2 text-base font-medium text-brand-green transition hover:bg-brand-teal/10"
-        >
-          {pasting ? "Cerrar" : "Pegar lista completa"}
-        </button>
-      </div>
-
-      {pasting ? (
-        <div className="flex flex-col gap-2 rounded-lg border border-brand-teal/40 bg-brand-teal/5 p-3">
-          <p className="text-sm text-ink-muted">
-            Pega la lista tal como la tienes, una línea por ítem. Las viñetas se
-            quitan solas y el número inicial se toma como cantidad.
-          </p>
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={5}
-            placeholder={"• 1 Vaso vinero personalizado\n• 3 chocolates Ferrero"}
-            className="w-full rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 font-mono text-sm text-ink focus:border-brand-teal focus:outline-none"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={!draft.trim()}
-              onClick={() => {
-                onChange([...contents, ...parseContentList(draft)]);
-                setDraft("");
-                setPasting(false);
-              }}
-              className="rounded-lg bg-brand-green px-4 py-2 text-base font-medium text-white transition hover:opacity-90 disabled:opacity-40"
-            >
-              Agregar {parseContentList(draft).length || ""} ítems
-            </button>
-            <button
-              type="button"
-              disabled={!draft.trim()}
-              onClick={() => {
-                onChange(parseContentList(draft));
-                setDraft("");
-                setPasting(false);
-              }}
-              className="rounded-lg border-2 border-line px-4 py-2 text-base text-ink transition hover:bg-brand-cream/50 disabled:opacity-40"
-            >
-              Reemplazar todo
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {contents.length > 0 ? (
         <ul className="flex flex-col gap-1.5 border-t border-line-soft pt-3">
@@ -179,17 +131,17 @@ export function ContentsEditor({
                 aria-label={`Cantidad del ítem ${i + 1}`}
                 className="w-20 rounded-lg border-2 border-line bg-surface-raised px-2 py-2.5 text-center text-base font-medium text-ink"
               />
-              <input
-                value={item.label}
-                onChange={(e) =>
-                  // Editar el texto a mano lo desliga del insumo: ya deja de ser
-                  // "ese" artículo de la biblioteca, y costearlo como tal daría
-                  // un número equivocado.
-                  update(i, { label: e.target.value, presetId: null })
-                }
+              {/* El nombre no se edita a mano: es lo que lo mantiene atado al
+                  insumo elegido arriba, que es lo que luego calcula el gasto
+                  real de la caja en Inventario. Si está mal, se quita y se
+                  agrega de nuevo bien buscado. */}
+              <span
                 aria-label={`Nombre del ítem ${i + 1}`}
-                className="flex-1 rounded-lg border-2 border-line bg-surface-raised px-3.5 py-2.5 text-base text-ink"
-              />
+                className="flex-1 truncate rounded-lg border-2 border-line-soft bg-brand-cream/40 px-3.5 py-2.5 text-base text-ink"
+                title={item.label}
+              >
+                {item.label}
+              </span>
               <button
                 type="button"
                 onClick={() => onChange(contents.filter((_, x) => x !== i))}

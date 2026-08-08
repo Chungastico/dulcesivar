@@ -17,13 +17,10 @@ export type Step = {
 export function StepIndicator({
   steps,
   current,
-  furthest,
   onGo,
 }: {
   steps: Step[];
   current: number;
-  /** Hasta dónde llegó: no se puede saltar a un paso aún no habilitado. */
-  furthest: number;
   onGo: (id: number) => void;
 }) {
   return (
@@ -31,21 +28,17 @@ export function StepIndicator({
       {steps.map((step, i) => {
         const done = step.id < current;
         const active = step.id === current;
-        const reachable = step.id <= furthest;
 
         return (
           <li key={step.id} className="flex flex-1 items-center gap-1">
             <button
               type="button"
-              disabled={!reachable}
               onClick={() => onGo(step.id)}
               aria-current={active ? "step" : undefined}
               className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition ${
                 active
                   ? "bg-brand-green text-white"
-                  : reachable
-                    ? "text-ink hover:bg-brand-cream/60"
-                    : "cursor-not-allowed text-ink-muted/60"
+                  : "text-ink hover:bg-brand-cream/60"
               }`}
             >
               <span

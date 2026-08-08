@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { ProductForm } from "@/components/admin/product-form";
-import { ProductImages } from "@/components/admin/product-images";
 import { DeleteProductButton } from "@/components/admin/delete-product-button";
 import { updateProduct } from "@/lib/actions/products";
 import { requireAdmin } from "@/lib/auth";
@@ -67,22 +66,19 @@ export default async function EditProductPage({
         </h1>
       </div>
 
-      {/* Gestión de fotos ya guardadas (portada / borrar). Va en su propia
-          tarjeta, separada del asistente de pasos de abajo, para que no se
-          confunda con "elegir fotos nuevas" del paso 1. */}
-      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
-        <h2 className="text-base font-semibold text-brand-green">
-          Imágenes guardadas
-        </h2>
-        <ProductImages images={images} publicUrlBase={publicUrlBase} />
-      </section>
-
+      {/* La gestión de fotos ya guardadas (portada / borrar) vive dentro del
+          panel "Foto de referencia" del formulario: antes había una galería
+          aparte arriba que mostraba la misma foto dos veces en pantalla. */}
       <ProductForm
         action={updateProduct.bind(null, product.id)}
         groups={groupsResult.data ?? []}
         presets={presetsResult.data ?? []}
         existingImages={images.length}
-        existingImageUrls={images.map((i) => `${publicUrlBase}/${i.storage_path}`)}
+        existingPhotos={images.map((i) => ({
+          id: i.id,
+          url: `${publicUrlBase}/${i.storage_path}`,
+          isCover: i.is_cover,
+        }))}
         submitLabel="Guardar cambios"
         initial={{
           name: product.name,

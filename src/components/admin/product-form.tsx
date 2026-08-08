@@ -10,7 +10,7 @@ import {
 } from "@/components/admin/contents-editor";
 import { StepIndicator, type Step } from "@/components/admin/form-steps";
 import { ImagePicker } from "@/components/admin/image-picker";
-import { PhotoRail } from "@/components/admin/photo-rail";
+import { PhotoRail, type ExistingPhoto } from "@/components/admin/photo-rail";
 import { TagPicker } from "@/components/admin/tag-picker";
 import { suggestDescription } from "@/lib/actions/describe-image";
 import { suggestTags } from "@/lib/actions/suggest-tags";
@@ -58,7 +58,7 @@ export function ProductForm({
   initial = EMPTY,
   submitLabel = "Guardar producto",
   existingImages = 0,
-  existingImageUrls = [],
+  existingPhotos = [],
 }: {
   action: (prev: ActionState, formData: FormData) => Promise<ActionState>;
   groups: AttributeGroupWithValues[];
@@ -66,13 +66,12 @@ export function ProductForm({
   initial?: ProductFormValues;
   submitLabel?: string;
   existingImages?: number;
-  /** URLs de las fotos ya guardadas, para mostrarlas en el panel lateral. */
-  existingImageUrls?: string[];
+  /** Fotos ya guardadas, para mostrarlas y gestionarlas en el panel lateral. */
+  existingPhotos?: ExistingPhoto[];
 }) {
   const [state, formAction] = useActionState(action, {});
 
   const [step, setStep] = useState(1);
-  const [furthest, setFurthest] = useState(1);
 
   const [name, setName] = useState(initial.name);
   const [price, setPrice] = useState(initial.price_usd);
@@ -175,29 +174,31 @@ export function ProductForm({
     return null;
   }
 
+  /** Salta a cualquier paso, sin validar: el indicador de pasos y "Atrás"
+   * quedan libres a propósito, para no obligar a completar en orden. */
   function go(target: number) {
-    if (target > step) {
-      const problem = validate(target);
-      if (problem) {
-        setStepError(problem);
-        return;
-      }
-    }
     setStepError(null);
     setStep(target);
-    setFurthest((f) => Math.max(f, target));
+  }
+
+  /** Avanza al siguiente paso solo si el actual ya está completo. Guía a
+   * quien va llenando en orden, sin bloquear a quien salta directo con el
+   * indicador de arriba. */
+  function goNext() {
+    const target = step + 1;
+    const problem = validate(target);
+    if (problem) {
+      setStepError(problem);
+      return;
+    }
+    go(target);
   }
 
   const isLast = step === STEPS.length;
 
   return (
     <form action={formAction} className="flex flex-col gap-4 pb-24">
-      <StepIndicator
-        steps={STEPS}
-        current={step}
-        furthest={furthest}
-        onGo={go}
-      />
+      <StepIndicator steps={STEPS} current={step} onGo={go} />
 
       {state.error ? (
         <p className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 text-base text-red-800">
@@ -356,45 +357,47 @@ export function ProductForm({
           </div>
         </div>
 
-        <PhotoRail previews={previews} existingUrls={existingImageUrls} />
+        <PhotoRail previews={previews} existingPhotos={existingPhotos} />
       </div>
 
       <input type="hidden" name="slug" value={slug} />
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface-raised/95 backdrop-blur lg:left-64">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-5 py-3">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={() => go(step - 1)}
-              className="rounded-lg border-2 border-line px-5 py-2.5 text-base font-medium text-ink transition hover:bg-brand-cream/50"
-            >
-              ← Atrás
-            </button>
-          ) : null}
-
-          {isLast ? (
-            <SubmitButton label={submitLabel} />
-          ) : (
-            <button
-              type="button"
-              onClick={() => go(step + 1)}
-              className="rounded-lg bg-brand-green px-6 py-2.5 text-base font-semibold text-white transition hover:opacity-90"
-            >
-              Siguiente →
-            </button>
-          )}
-
-          <span className="ml-auto hidden text-sm text-ink-muted sm:block">
-            Paso {step} de {STEPS.length}
-          </span>
-
           <Link
             href="/admin/catalogo"
             className="text-base text-ink-muted transition hover:text-ink hover:underline"
           >
             Cancelar
           </Link>
+
+          <span className="hidden text-sm text-ink-muted sm:block">
+            Paso {step} de {STEPS.length}
+          </span>
+
+          <div className="ml-auto flex items-center gap-3">
+            {step > 1 ? (
+              <button
+                type="button"
+                onClick={() => go(step - 1)}
+                className="rounded-lg border-2 border-line px-5 py-2.5 text-base font-medium text-ink transition hover:bg-brand-cream/50"
+              >
+                ← Atrás
+              </button>
+            ) : null}
+
+            {isLast ? (
+              <SubmitButton label={submitLabel} />
+            ) : (
+              <button
+                type="button"
+                onClick={goNext}
+                className="rounded-lg bg-brand-green px-6 py-2.5 text-base font-semibold text-white transition hover:opacity-90"
+              >
+                Siguiente →
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </form>

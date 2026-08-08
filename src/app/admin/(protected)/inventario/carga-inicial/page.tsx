@@ -1,13 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { BulkStockTable, type BulkVariant } from "@/components/admin/bulk-stock-table";
+import { BulkStockWizard, type BulkVariant } from "@/components/admin/bulk-stock-wizard";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { InventoryStatus, InventoryVariantStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
-  title: "Carga inicial de inventario",
+  title: "Carga de stock por lote",
   robots: { index: false, follow: false },
 };
 
@@ -48,10 +48,8 @@ export default async function CargaInicialPage() {
           Carga de stock por lote
         </h1>
         <p className="mt-1 max-w-2xl text-base text-ink-muted">
-          Escribe cantidad y costo total en la fila de cada insumo que tengas y
-          guarda todos de una vez, en vez de registrar uno por uno. Los
-          insumos con colores (tazas, termos…) aparecen con una fila por
-          color. Deja en blanco los que no apliquen.
+          Selecciona los insumos que compraste, llena cantidades y precios, y
+          guarda todo de una vez.
         </p>
       </div>
 
@@ -68,7 +66,7 @@ export default async function CargaInicialPage() {
               Supabase? Mientras tanto puedes seguir cargando el stock normal.
             </p>
           ) : null}
-          <BulkStockTable
+          <BulkStockWizard
             items={items}
             variantsByItem={variantsByItem}
             variantsEnabled={!variantResult.error}

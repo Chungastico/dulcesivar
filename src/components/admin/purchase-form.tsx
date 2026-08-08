@@ -1,22 +1,32 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 import { createVariant, registerPurchase } from "@/lib/actions/inventory";
 import type { ContentPresetVariant, InventoryStatus } from "@/lib/supabase/types";
 
+function normalize(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 /**
  * Registro de una compra de insumo.
  *
- * El precio se puede escribir como total pagado (como viene la factura) o
- * como costo por unidad (como se sabe de memoria un precio de lista): el que
- * se escriba último manda, y el otro se recalcula solo. Los dos guardan lo
- * mismo: total_cost, que es lo que exige la base.
+ * Rediseñado para resolver tres problemas de UX:
  *
- * Si el insumo elegido tiene colores (una taza, un termo…), aparece un
- * segundo selector para decir cuál. Los insumos sin colores no lo ven nunca:
- * la mayoría de lo que compra (chocolates, cajas) no los tiene.
+ * 1. El selector de insumo era un <select> nativo con 74+ opciones — ahora es
+ *    un buscador con autocompletado, como ya se usa en ContentsEditor.
+ *
+ * 2. "Mayoreo/Individual" no aportaba nada al usuario — reemplazado por un
+ *    toggle "Precio total" vs "Costo por unidad" que controla qué campo se
+ *    llena. El otro se calcula y se muestra como texto informativo.
+ *
+ * 3. Los tres campos de precio (cantidad, total, unitario) todos editables a
+ *    la vez confundían — ahora solo el campo del modo activo es editable.
  */
 export function PurchaseForm({
   items,
@@ -25,34 +35,53 @@ export function PurchaseForm({
 }: {
   items: InventoryStatus[];
   variantsByItem: Map<string, ContentPresetVariant[]>;
-  /** false si la migración 006 no se ha corrido: oculta el selector de color
-   *  en vez de dejar un botón que fallaría al usarlo. */
   variantsEnabled?: boolean;
 }) {
   const [state, action] = useActionState(registerPurchase, {});
-  const [quantity, setQuantity] = useState("");
-  const [total, setTotal] = useState("");
-  const [unitDraft, setUnitDraft] = useState("");
-  const [itemId, setItemId] = useState("");
   const [formKey, setFormKey] = useState(0);
 
-  const q = Number(quantity);
-  const t = Number(total);
-  const unit = q > 0 && total !== "" && !Number.isNaN(t) ? t / q : null;
+  // --- Insumo: buscador ---
+  const [query, setQuery] = useState("");
+  const [itemId, setItemId] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  // Escribir en "costo por unidad" recalcula el total; requiere la cantidad
-  // primero, porque sin ella no hay con qué multiplicar.
-  function handleUnitChange(value: string) {
-    setUnitDraft(value);
-    const u = Number(value);
-    if (q > 0 && value !== "" && !Number.isNaN(u)) {
-      setTotal((u * q).toFixed(2));
-    }
-  }
-
-  const today = new Date().toISOString().slice(0, 10);
   const selectedItem = items.find((i) => i.id === itemId);
   const variants = variantsByItem.get(itemId) ?? [];
+
+  const matches = useMemo(() => {
+    const q = normalize(query.trim());
+    if (!q) return items.slice(0, 8);
+    return items.filter(
+      (i) =>
+        normalize(i.label).includes(q) ||
+        normalize(i.category).includes(q),
+    ).slice(0, 8);
+  }, [items, query]);
+
+  function selectItem(item: InventoryStatus) {
+    setItemId(item.id);
+    setQuery(item.label);
+    setShowDropdown(false);
+  }
+
+  function clearItem() {
+    setItemId("");
+    setQuery("");
+  }
+
+  // --- Precio: modo total vs unitario ---
+  const [priceMode, setPriceMode] = useState<"total" | "unit">("total");
+  const [quantity, setQuantity] = useState("");
+  const [priceValue, setPriceValue] = useState("");
+
+  const q = Number(quantity);
+  const p = Number(priceValue);
+
+  // Cálculos derivados según el modo
+  const totalCost = priceMode === "total" ? p : q > 0 ? p * q : null;
+  const unitCost = priceMode === "unit" ? p : q > 0 ? p / q : null;
+
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <form
@@ -60,15 +89,11 @@ export function PurchaseForm({
       action={async (fd) => {
         await action(fd);
         setQuantity("");
-        setTotal("");
+        setPriceValue("");
         setFormKey((k) => k + 1);
       }}
-      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5"
+      className="flex flex-col gap-5"
     >
-      <h2 className="text-base font-semibold text-brand-green">
-        Registrar compra
-      </h2>
-
       {state.error ? (
         <p className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.error}
@@ -80,28 +105,86 @@ export function PurchaseForm({
         </p>
       ) : null}
 
-      <label className="flex flex-col gap-2">
+      {/* --- Buscador de insumo --- */}
+      <div className="flex flex-col gap-2">
         <span className="text-base font-medium text-ink">Insumo</span>
-        <select
-          name="item_id"
-          required
-          value={itemId}
-          onChange={(e) => setItemId(e.target.value)}
-          className={inputClass}
-        >
-          <option value="">Elige un insumo…</option>
-          {items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.label} ({item.category})
-            </option>
-          ))}
-        </select>
-      </label>
+        <div className="relative">
+          {itemId ? (
+            <div className="flex items-center gap-2 rounded-lg border-2 border-brand-green bg-brand-green/5 px-3.5 py-2.5">
+              <span className="flex-1 text-base text-ink">
+                {selectedItem?.label}
+                <span className="ml-1.5 text-sm text-ink-muted">
+                  ({selectedItem?.category})
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={clearItem}
+                className="rounded px-2 py-0.5 text-sm text-ink-muted transition hover:bg-red-50 hover:text-red-700"
+              >
+                Cambiar
+              </button>
+            </div>
+          ) : (
+            <>
+              <input
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                placeholder="Escribe para buscar un insumo…"
+                autoComplete="off"
+                className={inputClass}
+              />
+              {showDropdown ? (
+                <>
+                  {/* Overlay para cerrar al tocar fuera */}
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowDropdown(false)}
+                    className="fixed inset-0 z-10 cursor-default"
+                    aria-hidden
+                  />
+                  <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border-2 border-line bg-surface-raised shadow-xl">
+                    {matches.length > 0 ? (
+                      matches.map((item) => (
+                        <li key={item.id}>
+                          <button
+                            type="button"
+                            onClick={() => selectItem(item)}
+                            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-base text-ink transition hover:bg-brand-teal/15"
+                          >
+                            <span>{item.label}</span>
+                            <span className="text-sm text-ink-muted">
+                              {item.category}
+                            </span>
+                          </button>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-4 py-3 text-sm text-ink-muted">
+                        Ningún insumo coincide con «{query}».
+                      </li>
+                    )}
+                  </ul>
+                </>
+              ) : null}
+            </>
+          )}
+          {/* Hidden input para el form */}
+          <input type="hidden" name="item_id" value={itemId} />
+        </div>
+      </div>
 
+      {/* --- Selector de color/variante --- */}
       {itemId && variantsEnabled && selectedItem?.has_variants ? (
         <VariantPicker itemId={itemId} variants={variants} />
       ) : null}
 
+      {/* --- Cantidad --- */}
       <label className="flex flex-col gap-2">
         <span className="text-base font-medium text-ink">Cantidad</span>
         <input
@@ -111,102 +194,41 @@ export function PurchaseForm({
           min="0.001"
           required
           value={quantity}
-          onChange={(e) => {
-            setQuantity(e.target.value);
-            // Cambiar la cantidad con un costo unitario ya escrito debe
-            // recalcular el total; si se dejó el total a mano, ese se respeta.
-            const newQ = Number(e.target.value);
-            const u = Number(unitDraft);
-            if (unitDraft !== "" && newQ > 0 && !Number.isNaN(u)) {
-              setTotal((u * newQ).toFixed(2));
-            }
-          }}
+          onChange={(e) => setQuantity(e.target.value)}
           placeholder="24"
           className={inputClass}
         />
       </label>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2">
-          <span className="text-base font-medium text-ink">
-            Precio total pagado
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-ink-muted">$</span>
-            <input
-              name="total_cost"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              value={total}
-              onChange={(e) => {
-                setTotal(e.target.value);
-                setUnitDraft(""); // el total escrito a mano manda sobre el unitario
-              }}
-              placeholder="18.00"
-              className={inputClass}
-            />
-          </div>
-        </label>
-
-        <label className="flex flex-col gap-2">
-          <span className="text-base font-medium text-ink">
-            …o costo por unidad{" "}
-            <span className="text-ink-muted">(calcula el total)</span>
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-ink-muted">$</span>
-            <input
-              type="number"
-              step="0.0001"
-              min="0"
-              value={unitDraft}
-              onChange={(e) => handleUnitChange(e.target.value)}
-              disabled={!(q > 0)}
-              title={q > 0 ? undefined : "Escribe la cantidad primero"}
-              placeholder={q > 0 ? "0.75" : "Escribe la cantidad primero"}
-              className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-50`}
-            />
-          </div>
-        </label>
-      </div>
-
-      <p
-        className={`rounded-lg px-3 py-2 text-base ${
-          unit !== null
-            ? "bg-brand-cream/60 text-brand-green"
-            : "bg-surface text-ink-muted"
-        }`}
-      >
-        {unit !== null ? (
-          <>
-            Costo por unidad:{" "}
-            <strong className="font-semibold">${unit.toFixed(4)}</strong>
-          </>
-        ) : (
-          "Escribe cantidad y precio para ver el costo por unidad."
-        )}
-      </p>
-
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-base font-medium text-ink">Tipo de compra</legend>
-        <div className="flex flex-wrap gap-2">
+      {/* --- Modo de precio --- */}
+      <fieldset className="flex flex-col gap-3">
+        <legend className="text-base font-medium text-ink">
+          ¿Cómo tenés el precio?
+        </legend>
+        <div className="flex gap-2">
           {(
             [
-              ["mayoreo", "Mayoreo", "Compra grande a menor precio unitario"],
-              ["individual", "Individual", "Compra suelta o de reposición"],
+              ["total", "Precio total", "Lo que pagaste en total"],
+              ["unit", "Costo por unidad", "Cuánto cuesta cada uno"],
             ] as const
-          ).map(([value, label, hint], i) => (
+          ).map(([value, label, hint]) => (
             <label
               key={value}
-              className="flex flex-1 cursor-pointer items-start gap-2 rounded-lg border-2 border-line bg-surface px-3 py-2 transition has-checked:border-brand-green has-checked:bg-brand-green/10"
+              className={`flex flex-1 cursor-pointer items-start gap-2 rounded-lg border-2 px-3 py-2.5 transition ${
+                priceMode === value
+                  ? "border-brand-green bg-brand-green/10"
+                  : "border-line bg-surface hover:border-brand-teal/50"
+              }`}
             >
               <input
                 type="radio"
-                name="purchase_type"
+                name="_price_mode"
                 value={value}
-                defaultChecked={i === 1}
+                checked={priceMode === value}
+                onChange={() => {
+                  setPriceMode(value);
+                  setPriceValue("");
+                }}
                 className="mt-1 size-4 accent-[var(--brand-green)]"
               />
               <span className="flex flex-col">
@@ -216,8 +238,59 @@ export function PurchaseForm({
             </label>
           ))}
         </div>
+
+        {/* Campo de precio activo */}
+        <label className="flex flex-col gap-1.5">
+          <span className="text-sm text-ink-muted">
+            {priceMode === "total"
+              ? "Total pagado (como viene en la factura)"
+              : "Precio por cada unidad"}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold text-ink-muted">$</span>
+            <input
+              type="number"
+              step={priceMode === "total" ? "0.01" : "0.0001"}
+              min="0"
+              required
+              value={priceValue}
+              onChange={(e) => setPriceValue(e.target.value)}
+              placeholder={priceMode === "total" ? "18.00" : "0.75"}
+              className={inputClass}
+            />
+          </div>
+        </label>
+
+        {/* Cálculo derivado — solo informativo */}
+        {q > 0 && priceValue && !Number.isNaN(p) ? (
+          <p className="rounded-lg bg-brand-cream/50 px-3.5 py-2 text-sm text-ink">
+            {priceMode === "total" ? (
+              <>
+                Costo por unidad:{" "}
+                <strong className="text-brand-green">
+                  ${unitCost?.toFixed(4)}
+                </strong>
+              </>
+            ) : (
+              <>
+                Total a pagar:{" "}
+                <strong className="text-brand-green">
+                  ${totalCost?.toFixed(2)}
+                </strong>
+              </>
+            )}
+          </p>
+        ) : null}
+
+        {/* Hidden: mandamos siempre total_cost a la base */}
+        <input
+          type="hidden"
+          name="total_cost"
+          value={totalCost != null && !Number.isNaN(totalCost) ? totalCost.toFixed(2) : ""}
+        />
       </fieldset>
 
+      {/* --- Fecha y proveedor --- */}
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className="text-base font-medium text-ink">Fecha</span>
@@ -243,6 +316,9 @@ export function PurchaseForm({
         </label>
       </div>
 
+      {/* purchase_type ya no se expone: siempre "individual" */}
+      <input type="hidden" name="purchase_type" value="individual" />
+
       <SubmitButton />
     </form>
   );
@@ -250,14 +326,6 @@ export function PurchaseForm({
 
 /**
  * Selector de color del insumo elegido, con alta rápida si falta uno.
- *
- * Solo se muestra cuando el insumo ya está marcado como "Colores" en la tabla
- * de costos (has_variants) — eso es lo que decide si un insumo tiene colores,
- * no si ya existe algún color cargado. Por eso aquí no hace falta preguntar
- * "¿tiene colores?": ya se sabe que sí, solo falta cuáles.
- *
- * Vive fuera del <select> nativo del insumo para poder mostrarse u ocultarse
- * sin perder lo que ella ya escribió en cantidad/precio.
  */
 function VariantPicker({
   itemId,
@@ -270,8 +338,6 @@ function VariantPicker({
   const [newName, setNewName] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // Colores creados en esta sesión, antes de que la página vuelva a cargar
-  // los datos del servidor con la lista actualizada.
   const [justAdded, setJustAdded] = useState<ContentPresetVariant[]>([]);
 
   const all = [...variants, ...justAdded];

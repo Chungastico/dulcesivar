@@ -5,6 +5,14 @@ import { useFormStatus } from "react-dom";
 
 import { createInventoryItem } from "@/lib/actions/inventory";
 
+const UNITS = [
+  { value: "unidad", label: "Unidad", hint: "Chocolates, tazas…" },
+  { value: "libra", label: "Libra", hint: "Café, azúcar…" },
+  { value: "paquete", label: "Paquete", hint: "Bolsas, cajas…" },
+  { value: "metro", label: "Metro", hint: "Listón, tela…" },
+  { value: "onza", label: "Onza", hint: "Productos pequeños" },
+] as const;
+
 /**
  * Alta de un insumo nuevo en la biblioteca.
  *
@@ -16,6 +24,7 @@ import { createInventoryItem } from "@/lib/actions/inventory";
 export function NewItemForm({ categories }: { categories: string[] }) {
   const [state, action] = useActionState(createInventoryItem, {});
   const [key, setKey] = useState(0);
+  const [unit, setUnit] = useState("unidad");
 
   return (
     <form
@@ -24,15 +33,8 @@ export function NewItemForm({ categories }: { categories: string[] }) {
         await action(fd);
         setKey((k) => k + 1);
       }}
-      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-raised p-5"
+      className="flex flex-col gap-5"
     >
-      <h2 className="text-base font-semibold text-brand-green">
-        Agregar insumo nuevo
-      </h2>
-      <p className="text-sm text-ink-muted">
-        ¿No aparece en la lista de «Registrar compra»? Créalo aquí.
-      </p>
-
       {state.error ? (
         <p className="rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.error}
@@ -45,7 +47,9 @@ export function NewItemForm({ categories }: { categories: string[] }) {
       ) : null}
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-ink">Nombre</span>
+        <span className="text-sm font-medium text-ink">
+          Nombre <span className="text-brand-orange">*</span>
+        </span>
         <input
           name="label"
           required
@@ -55,43 +59,54 @@ export function NewItemForm({ categories }: { categories: string[] }) {
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink">Categoría</span>
-          <input
-            name="category"
-            list="new-item-categories"
-            placeholder="Otros"
-            className={inputClass}
-          />
-          <datalist id="new-item-categories">
-            {categories.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        </label>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium text-ink">Categoría</span>
+        <input
+          name="category"
+          list="new-item-categories"
+          placeholder="Otros"
+          className={inputClass}
+        />
+        <datalist id="new-item-categories">
+          {categories.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
+      </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium text-ink">Unidad</span>
-          <input
-            name="unit"
-            list="new-item-units"
-            placeholder="unidad"
-            defaultValue="unidad"
-            className={inputClass}
-          />
-          <datalist id="new-item-units">
-            <option value="unidad" />
-            <option value="libra" />
-            <option value="onza" />
-            <option value="metro" />
-            <option value="paquete" />
-          </datalist>
-        </label>
-      </div>
+      <fieldset className="flex flex-col gap-2">
+        <legend className="text-sm font-medium text-ink">
+          ¿Cómo se mide?
+        </legend>
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {UNITS.map((u) => (
+            <label
+              key={u.value}
+              className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-2.5 text-center transition ${
+                unit === u.value
+                  ? "border-brand-green bg-brand-green/10"
+                  : "border-line bg-surface hover:border-brand-teal/50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="unit"
+                value={u.value}
+                checked={unit === u.value}
+                onChange={() => setUnit(u.value)}
+                className="sr-only"
+              />
+              <span className="text-sm font-medium text-ink">{u.label}</span>
+              <span className="text-[11px] leading-tight text-ink-muted">
+                {u.hint}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <label className="flex items-center gap-2 text-base text-ink">
-        <input type="checkbox" name="has_variants" className="size-4" />
+        <input type="checkbox" name="has_variants" className="size-4 accent-[var(--brand-green)]" />
         Viene en colores u otras variantes
       </label>
 

@@ -26,7 +26,7 @@ const purchaseSchema = z.object({
     .number({ message: "El precio total es obligatorio" })
     .min(0, "El precio no puede ser negativo")
     .max(1_000_000),
-  purchase_type: z.enum(["mayoreo", "individual"]),
+  purchase_type: z.enum(["mayoreo", "individual"]).default("individual"),
   supplier: z.string().trim().max(120).optional(),
   purchased_at: z.string().trim().min(1, "Falta la fecha"),
   notes: z.string().trim().max(500).optional(),
