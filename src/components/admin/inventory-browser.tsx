@@ -205,9 +205,8 @@ function ItemRows({
         onClick={onEdit}
         title="Toca para configurar colores"
       >
-        <td className="py-2 pl-4 pr-3 text-ink">
+        <td className="py-2 pl-4 pr-3 text-ink font-medium">
           {item.label}
-          <span className="ml-1.5 text-sm text-ink-muted">({item.unit})</span>
         </td>
         <td className="py-2 pr-3 text-center">
           {item.has_variants ? (
@@ -302,7 +301,7 @@ function ItemEditModal({
       open
       onClose={onClose}
       title={item.label}
-      description={`${item.category} · ${item.unit}`}
+      description={item.category}
     >
       <div className="flex flex-col gap-5">
         {/* Toggle de colores */}

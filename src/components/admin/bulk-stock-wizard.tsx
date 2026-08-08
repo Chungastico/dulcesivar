@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { StepIndicator, type Step } from "@/components/admin/form-steps";
+import { QuickItemModal } from "@/components/admin/quick-item-modal";
 import {
   bulkRegisterInventory,
   createVariant,
@@ -39,7 +40,6 @@ type SelectedEntry = {
   variantId: string | null;
   label: string;
   parentLabel?: string;
-  unit: string;
   existing: number;
 };
 
@@ -47,7 +47,7 @@ type SelectedEntry = {
  * Wizard de carga por lote, en 3 pasos.
  *
  * Paso 1: Buscar y seleccionar insumos (con colores). Se pueden agregar
- *         múltiples colores a la vez y crear colores nuevos inline.
+ *         múltiples colores a la vez y crear insumos o colores nuevos inline.
  * Paso 2: Llenar cantidades y precios para los seleccionados.
  * Paso 3: Revisar resumen y guardar todo.
  */
@@ -63,6 +63,10 @@ export function BulkStockWizard({
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [stepError, setStepError] = useState<string | null>(null);
+
+  // Insumos creados localmente durante la sesión
+  const [localItems, setLocalItems] = useState<InventoryStatus[]>([]);
+  const allItems = useMemo(() => [...items, ...localItems], [items, localItems]);
 
   // --- Step 1: Selección ---
   const [selected, setSelected] = useState<Map<string, SelectedEntry>>(
@@ -208,12 +212,36 @@ export function BulkStockWizard({
       {/* --- PASO 1: Seleccionar insumos --- */}
       {step === 1 ? (
         <StepSelectItems
-          items={items}
+          items={allItems}
           variantsFor={variantsFor}
           variantsEnabled={variantsEnabled}
           selected={selected}
           isSelected={isSelected}
           toggleEntry={toggleEntry}
+          onItemCreated={(newItem) => {
+            const itemObj: InventoryStatus = {
+              id: newItem.id,
+              label: newItem.label,
+              category: newItem.category,
+              unit: "unidad",
+              has_variants: newItem.has_variants,
+              total_quantity: 0,
+              total_invested: 0,
+              avg_unit_cost: null,
+              is_active: true,
+              purchase_count: 0,
+              last_purchase_at: null,
+            };
+            setLocalItems((prev) => [...prev, itemObj]);
+            if (!newItem.has_variants) {
+              toggleEntry({
+                itemId: newItem.id,
+                variantId: null,
+                label: newItem.label,
+                existing: 0,
+              });
+            }
+          }}
           onVariantCreated={(itemId, variant) =>
             setLocalVariants((prev) => ({
               ...prev,
@@ -303,6 +331,7 @@ function StepSelectItems({
   selected,
   isSelected,
   toggleEntry,
+  onItemCreated,
   onVariantCreated,
 }: {
   items: InventoryStatus[];
@@ -311,9 +340,20 @@ function StepSelectItems({
   selected: Map<string, SelectedEntry>;
   isSelected: (itemId: string, variantId: string | null) => boolean;
   toggleEntry: (entry: SelectedEntry) => void;
+  onItemCreated: (item: {
+    id: string;
+    label: string;
+    category: string;
+    has_variants: boolean;
+  }) => void;
   onVariantCreated: (itemId: string, variant: BulkVariant) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(items.map((i) => i.category).filter(Boolean)));
+  }, [items]);
 
   const byCategory = useMemo(() => {
     const q = normalize(query.trim());
@@ -345,19 +385,37 @@ function StepSelectItems({
             elige cuáles.
           </p>
         </div>
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Buscar insumo…"
-          aria-label="Buscar insumo"
-          className="w-full rounded-lg border-2 border-line bg-surface px-3.5 py-2 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none sm:w-64"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar o agregar insumo…"
+            aria-label="Buscar insumo"
+            className="w-full rounded-lg border-2 border-line bg-surface px-3.5 py-2 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none sm:w-64"
+          />
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="shrink-0 rounded-lg bg-brand-green px-3.5 py-2 text-sm font-medium text-white transition hover:opacity-90"
+          >
+            + Nuevo insumo
+          </button>
+        </div>
       </div>
 
       {byCategory.length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-base text-ink-muted">
-          Ningún insumo coincide con "{query}".
-        </p>
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line px-4 py-10 text-center">
+          <p className="text-base text-ink-muted">
+            Ningún insumo coincide con "{query}".
+          </p>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="rounded-lg bg-brand-green px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            + Crear "{query.trim() || "nuevo insumo"}"
+          </button>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {byCategory.map(([category, list]) => (
@@ -397,6 +455,19 @@ function StepSelectItems({
             </span>
           ))}
         </div>
+      ) : null}
+
+      {creating ? (
+        <QuickItemModal
+          open
+          initialName={query.trim()}
+          categories={categories}
+          onClose={() => setCreating(false)}
+          onCreated={(newItem) => {
+            onItemCreated(newItem);
+            setQuery("");
+          }}
+        />
       ) : null}
     </section>
   );
@@ -456,9 +527,6 @@ function CategoryGroup({
                 <li key={item.id} className="px-4 py-3">
                   <p className="text-base font-medium text-ink">
                     {item.label}
-                    <span className="ml-1.5 text-sm text-ink-muted">
-                      ({item.unit})
-                    </span>
                     <span className="ml-2 inline-block rounded-full bg-brand-teal/15 px-2 py-0.5 text-xs font-medium text-brand-green">
                       Colores
                     </span>
@@ -484,7 +552,6 @@ function CategoryGroup({
                                 variantId: v.id,
                                 label: v.name,
                                 parentLabel: item.label,
-                                unit: item.unit,
                                 existing: v.totalQuantity,
                               })
                             }
@@ -504,13 +571,11 @@ function CategoryGroup({
                         itemId={item.id}
                         onCreated={(variant) => {
                           onVariantCreated(item.id, variant);
-                          // Auto-seleccionar el color recién creado
                           toggleEntry({
                             itemId: item.id,
                             variantId: variant.id,
                             label: variant.name,
                             parentLabel: item.label,
-                            unit: item.unit,
                             existing: 0,
                           });
                         }}
@@ -543,7 +608,6 @@ function CategoryGroup({
                         itemId: item.id,
                         variantId: null,
                         label: item.label,
-                        unit: item.unit,
                         existing: Number(item.total_quantity) || 0,
                       })
                     }
@@ -551,9 +615,6 @@ function CategoryGroup({
                   />
                   <span className="flex-1 text-base text-ink">
                     {item.label}
-                    <span className="ml-1.5 text-sm text-ink-muted">
-                      ({item.unit})
-                    </span>
                   </span>
                   {Number(item.total_quantity) > 0 ? (
                     <span className="text-sm text-ink-muted">
@@ -570,7 +631,7 @@ function CategoryGroup({
   );
 }
 
-/** Alta de color en línea: botón + input inline */
+/** Alta de color en línea */
 function AddColorInline({
   itemId,
   onCreated,
@@ -714,7 +775,7 @@ function StepQuantities({
             type="button"
             onClick={() => {
               setPriceMode(value);
-              setPrices({}); // Reset al cambiar modo para evitar confusión
+              setPrices({});
             }}
             className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition ${
               priceMode === value
@@ -750,7 +811,6 @@ function StepQuantities({
               const price = prices[key] ?? "";
               const q = Number(qty);
               const p = Number(price);
-              const tc = totalCostFor(key);
               const derivedUnit =
                 priceMode === "total" && q > 0 && p > 0 ? p / q : null;
               const derivedTotal =
@@ -769,9 +829,6 @@ function StepQuantities({
                     ) : (
                       entry.label
                     )}
-                    <span className="ml-1 text-sm text-ink-muted">
-                      ({entry.unit})
-                    </span>
                   </td>
                   <td className="py-2 pr-3 text-right text-sm text-ink-muted">
                     {entry.existing > 0 ? entry.existing : "—"}
@@ -838,7 +895,6 @@ function StepConfirm({
   selected,
   quantities,
   prices,
-  priceMode,
   totalCostFor,
   purchasedAt,
   setPurchasedAt,

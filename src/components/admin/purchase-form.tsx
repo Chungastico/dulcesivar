@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
+import { QuickItemModal } from "@/components/admin/quick-item-modal";
 import { createVariant, registerPurchase } from "@/lib/actions/inventory";
 import type { ContentPresetVariant, InventoryStatus } from "@/lib/supabase/types";
 
@@ -15,18 +16,6 @@ function normalize(text: string) {
 
 /**
  * Registro de una compra de insumo.
- *
- * Rediseñado para resolver tres problemas de UX:
- *
- * 1. El selector de insumo era un <select> nativo con 74+ opciones — ahora es
- *    un buscador con autocompletado, como ya se usa en ContentsEditor.
- *
- * 2. "Mayoreo/Individual" no aportaba nada al usuario — reemplazado por un
- *    toggle "Precio total" vs "Costo por unidad" que controla qué campo se
- *    llena. El otro se calcula y se muestra como texto informativo.
- *
- * 3. Los tres campos de precio (cantidad, total, unitario) todos editables a
- *    la vez confundían — ahora solo el campo del modo activo es editable.
  */
 export function PurchaseForm({
   items,
@@ -40,23 +29,32 @@ export function PurchaseForm({
   const [state, action] = useActionState(registerPurchase, {});
   const [formKey, setFormKey] = useState(0);
 
+  // --- Insumos locales creados en la misma sesión ---
+  const [localItems, setLocalItems] = useState<InventoryStatus[]>([]);
+  const allItems = useMemo(() => [...items, ...localItems], [items, localItems]);
+
+  const categories = useMemo(() => {
+    return Array.from(new Set(allItems.map((i) => i.category).filter(Boolean)));
+  }, [allItems]);
+
   // --- Insumo: buscador ---
   const [query, setQuery] = useState("");
   const [itemId, setItemId] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  const selectedItem = items.find((i) => i.id === itemId);
+  const selectedItem = allItems.find((i) => i.id === itemId);
   const variants = variantsByItem.get(itemId) ?? [];
 
   const matches = useMemo(() => {
     const q = normalize(query.trim());
-    if (!q) return items.slice(0, 8);
-    return items.filter(
+    if (!q) return allItems.slice(0, 8);
+    return allItems.filter(
       (i) =>
         normalize(i.label).includes(q) ||
         normalize(i.category).includes(q),
     ).slice(0, 8);
-  }, [items, query]);
+  }, [allItems, query]);
 
   function selectItem(item: InventoryStatus) {
     setItemId(item.id);
@@ -134,7 +132,7 @@ export function PurchaseForm({
                   setShowDropdown(true);
                 }}
                 onFocus={() => setShowDropdown(true)}
-                placeholder="Escribe para buscar un insumo…"
+                placeholder="Escribe para buscar o crear un insumo…"
                 autoComplete="off"
                 className={inputClass}
               />
@@ -148,27 +146,36 @@ export function PurchaseForm({
                     className="fixed inset-0 z-10 cursor-default"
                     aria-hidden
                   />
-                  <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border-2 border-line bg-surface-raised shadow-xl">
-                    {matches.length > 0 ? (
-                      matches.map((item) => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            onClick={() => selectItem(item)}
-                            className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-base text-ink transition hover:bg-brand-teal/15"
-                          >
-                            <span>{item.label}</span>
-                            <span className="text-sm text-ink-muted">
-                              {item.category}
-                            </span>
-                          </button>
-                        </li>
-                      ))
-                    ) : (
-                      <li className="px-4 py-3 text-sm text-ink-muted">
-                        Ningún insumo coincide con "{query}".
+                  <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border-2 border-line bg-surface-raised shadow-xl">
+                    {matches.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => selectItem(item)}
+                          className="flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left text-base text-ink transition hover:bg-brand-teal/15"
+                        >
+                          <span>{item.label}</span>
+                          <span className="text-sm text-ink-muted">
+                            {item.category}
+                          </span>
+                        </button>
                       </li>
-                    )}
+                    ))}
+
+                    <li className="border-t border-line-soft bg-surface">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDropdown(false);
+                          setCreating(true);
+                        }}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-medium text-brand-green hover:bg-brand-teal/15"
+                      >
+                        <span>
+                          + Crear {query.trim() ? `"${query.trim()}"` : "nuevo insumo"}
+                        </span>
+                      </button>
+                    </li>
                   </ul>
                 </>
               ) : null}
@@ -320,6 +327,32 @@ export function PurchaseForm({
       <input type="hidden" name="purchase_type" value="individual" />
 
       <SubmitButton />
+
+      {creating ? (
+        <QuickItemModal
+          open
+          initialName={query.trim()}
+          categories={categories}
+          onClose={() => setCreating(false)}
+          onCreated={(newItem) => {
+            const itemObj: InventoryStatus = {
+              id: newItem.id,
+              label: newItem.label,
+              category: newItem.category,
+              unit: "unidad",
+              has_variants: newItem.has_variants,
+              total_quantity: 0,
+              total_invested: 0,
+              avg_unit_cost: null,
+              is_active: true,
+              purchase_count: 0,
+              last_purchase_at: null,
+            };
+            setLocalItems((prev) => [...prev, itemObj]);
+            selectItem(itemObj);
+          }}
+        />
+      ) : null}
     </form>
   );
 }

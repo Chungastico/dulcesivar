@@ -92,16 +92,16 @@ export default async function EditProductPage({
         }}
       />
 
-      <section className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50/60 p-5">
-        <h2 className="text-base font-semibold text-red-800">
-          Eliminar producto
-        </h2>
-        <p className="text-sm text-red-800/80">
-          Borra el producto, su contenido y sus imágenes. No se puede deshacer.
-        </p>
-        <div className="mt-1">
-          <DeleteProductButton productId={product.id} productName={product.name} />
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-red-200 bg-red-50/40 p-5">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-base font-semibold text-red-900">
+            Zona de peligro
+          </h2>
+          <p className="text-sm text-ink-muted">
+            Elimina este producto, sus fotos y su configuración permanentemente.
+          </p>
         </div>
+        <DeleteProductButton productId={product.id} productName={product.name} />
       </section>
     </div>
   );

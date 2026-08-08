@@ -70,18 +70,16 @@ export default async function CatalogoPage({
       </header>
 
       <div className="grid items-start gap-6 lg:grid-cols-[16rem_1fr]">
-        <div className="lg:sticky lg:top-6">
-          <FilterSidebar
-            groups={groups}
-            filters={filters}
-            counts={counts}
-            budgetCounts={budgetCounts}
-            total={products.length}
-            shown={visible.length}
-          />
-        </div>
+        <FilterSidebar
+          groups={groups}
+          filters={filters}
+          counts={counts}
+          budgetCounts={budgetCounts}
+          total={products.length}
+          shown={visible.length}
+        />
 
-        <div className="flex flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-5">
           <CatalogToolbar
             query={filters.query}
             sort={filters.sort}

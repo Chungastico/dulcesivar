@@ -5,26 +5,16 @@ import { useFormStatus } from "react-dom";
 
 import { createInventoryItem } from "@/lib/actions/inventory";
 
-const UNITS = [
-  { value: "unidad", label: "Unidad", hint: "Chocolates, tazas…" },
-  { value: "libra", label: "Libra", hint: "Café, azúcar…" },
-  { value: "paquete", label: "Paquete", hint: "Bolsas, cajas…" },
-  { value: "metro", label: "Metro", hint: "Listón, tela…" },
-  { value: "onza", label: "Onza", hint: "Productos pequeños" },
-] as const;
-
 /**
  * Alta de un insumo nuevo en la biblioteca.
  *
- * Sin esto, la única forma de agregar artículos era la migración SQL con los
- * 74 insumos iniciales: cualquier cosa que ella compre después no tenía dónde
- * entrar. El datalist de categorías reutiliza las que ya existen para que no
+ * El datalist de categorías reutiliza las que ya existen para que no
  * termine con "Comestibles" y "comestibles" como categorías distintas.
+ * Todo se maneja en unidades.
  */
 export function NewItemForm({ categories }: { categories: string[] }) {
   const [state, action] = useActionState(createInventoryItem, {});
   const [key, setKey] = useState(0);
-  const [unit, setUnit] = useState("unidad");
 
   return (
     <form
@@ -74,36 +64,7 @@ export function NewItemForm({ categories }: { categories: string[] }) {
         </datalist>
       </label>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className="text-sm font-medium text-ink">
-          ¿Cómo se mide?
-        </legend>
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-          {UNITS.map((u) => (
-            <label
-              key={u.value}
-              className={`flex cursor-pointer flex-col items-center gap-0.5 rounded-xl border-2 px-2 py-2.5 text-center transition ${
-                unit === u.value
-                  ? "border-brand-green bg-brand-green/10"
-                  : "border-line bg-surface hover:border-brand-teal/50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="unit"
-                value={u.value}
-                checked={unit === u.value}
-                onChange={() => setUnit(u.value)}
-                className="sr-only"
-              />
-              <span className="text-sm font-medium text-ink">{u.label}</span>
-              <span className="text-[11px] leading-tight text-ink-muted">
-                {u.hint}
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      <input type="hidden" name="unit" value="unidad" />
 
       <label className="flex items-center gap-2 text-base text-ink">
         <input type="checkbox" name="has_variants" className="size-4 accent-[var(--brand-green)]" />

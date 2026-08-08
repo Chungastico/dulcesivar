@@ -313,7 +313,45 @@ export async function createInventoryItem(
   }
 
   revalidatePath("/admin/inventario");
-  return { ok: `Insumo «${label}» agregado.` };
+  return { ok: `Insumo "${label}" agregado.` };
+}
+
+/** Alta rápida de insumo desde buscadores (qué incluye, registrar compra, carga por lote). */
+export async function quickCreateInventoryItem(
+  label: string,
+  category: string = "Otros",
+  hasVariants: boolean = false,
+): Promise<{ id?: string; label?: string; category?: string; error?: string }> {
+  await requireAdmin();
+  const trimmed = label.trim();
+  if (trimmed.length < 2) return { error: "Escribe el nombre del insumo." };
+
+  const { data, error } = await supabaseAdmin()
+    .from("content_presets")
+    .insert({
+      label: trimmed,
+      category: category.trim() || "Otros",
+      unit: "unidad",
+      has_variants: hasVariants,
+      sort_order: 999,
+      is_active: true,
+    })
+    .select("id, label, category")
+    .single();
+
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "Ya existe un insumo con ese nombre."
+          : error.message,
+    };
+  }
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/catalogo");
+  revalidatePath("/admin/inventario/carga-inicial");
+  return { id: data.id, label: data.label, category: data.category };
 }
 
 /**

@@ -257,7 +257,7 @@ export function FilterSidebar(props: {
       <aside
         className={`${
           open ? "flex" : "hidden"
-        } fixed inset-y-0 left-0 z-50 w-[88%] max-w-sm flex-col bg-surface-raised shadow-2xl lg:flex lg:static lg:z-auto lg:w-auto lg:max-w-none lg:rounded-2xl lg:border lg:border-line lg:shadow-none`}
+        } fixed inset-y-0 left-0 z-50 w-[88%] max-w-sm flex-col bg-surface-raised shadow-2xl lg:flex lg:sticky lg:top-6 lg:z-auto lg:h-[calc(100vh-3rem)] lg:max-h-[calc(100vh-3rem)] lg:w-full lg:max-w-none lg:rounded-2xl lg:border lg:border-line lg:shadow-none`}
       >
         <div className="flex items-center justify-between border-b border-line px-4 py-3 lg:hidden">
           <span className="text-base font-semibold text-brand-green">
@@ -273,7 +273,7 @@ export function FilterSidebar(props: {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 overscroll-contain">
           <FilterControls {...props} />
         </div>
 
