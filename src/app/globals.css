@@ -52,10 +52,31 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Serif con contraste alto para los titulares de las páginas de venta. El
+     sans solo no distingue a la marca de cualquier plantilla; la mezcla sí. */
+  --font-display: var(--font-fraunces);
 }
 
 body {
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* La cabecera es fija: sin esto, cualquier ancla dentro de la página deja el
+   destino tapado detrás de la barra. */
+html {
+  scroll-padding-top: 5rem;
+}
+
+/**
+ * Papel: un grano muy tenue sobre el fondo crema. Es lo que separa el sitio de
+ * un degradado plano de plantilla, y al ser un gradiente repetido no cuesta
+ * ninguna petición de red.
+ */
+.paper {
+  background-image:
+    radial-gradient(circle at 20% 30%, rgb(242 230 194 / 0.55) 0, transparent 45%),
+    radial-gradient(circle at 85% 10%, rgb(31 191 162 / 0.1) 0, transparent 40%),
+    radial-gradient(circle at 70% 85%, rgb(242 143 22 / 0.08) 0, transparent 45%);
 }
