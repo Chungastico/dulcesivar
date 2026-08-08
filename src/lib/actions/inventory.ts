@@ -348,9 +348,6 @@ export async function quickCreateInventoryItem(
     };
   }
 
-  revalidatePath("/admin/inventario");
-  revalidatePath("/admin/catalogo");
-  revalidatePath("/admin/inventario/carga-inicial");
   return { id: data.id, label: data.label, category: data.category };
 }
 
