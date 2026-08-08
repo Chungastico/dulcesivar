@@ -67,17 +67,16 @@ export function PurchaseForm({
     setQuery("");
   }
 
-  // --- Precio: modo total vs unitario ---
-  const [priceMode, setPriceMode] = useState<"total" | "unit">("total");
+  // --- Precio ---
+  // Solo costo unitario. El total se muestra como confirmación y lo recalcula
+  // la server action antes de guardar; aquí no se manda.
   const [quantity, setQuantity] = useState("");
   const [priceValue, setPriceValue] = useState("");
 
   const q = Number(quantity);
   const p = Number(priceValue);
 
-  // Cálculos derivados según el modo
-  const totalCost = priceMode === "total" ? p : q > 0 ? p * q : null;
-  const unitCost = priceMode === "unit" ? p : q > 0 ? p / q : null;
+  const totalCost = q > 0 && p >= 0 ? p * q : null;
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -197,8 +196,11 @@ export function PurchaseForm({
         <input
           name="quantity"
           type="number"
-          step="0.001"
-          min="0.001"
+          // Entero: con step="0.001" las flechitas dejaban cantidades como
+          // 19.999 en vez de 20.
+          step="1"
+          min="1"
+          inputMode="numeric"
           required
           value={quantity}
           onChange={(e) => setQuantity(e.target.value)}
@@ -207,95 +209,35 @@ export function PurchaseForm({
         />
       </label>
 
-      {/* --- Modo de precio --- */}
-      <fieldset className="flex flex-col gap-3">
-        <legend className="text-base font-medium text-ink">
-          ¿Cómo tenés el precio?
-        </legend>
-        <div className="flex gap-2">
-          {(
-            [
-              ["total", "Precio total", "Lo que pagaste en total"],
-              ["unit", "Costo por unidad", "Cuánto cuesta cada uno"],
-            ] as const
-          ).map(([value, label, hint]) => (
-            <label
-              key={value}
-              className={`flex flex-1 cursor-pointer items-start gap-2 rounded-lg border-2 px-3 py-2.5 transition ${
-                priceMode === value
-                  ? "border-brand-green bg-brand-green/10"
-                  : "border-line bg-surface hover:border-brand-teal/50"
-              }`}
-            >
-              <input
-                type="radio"
-                name="_price_mode"
-                value={value}
-                checked={priceMode === value}
-                onChange={() => {
-                  setPriceMode(value);
-                  setPriceValue("");
-                }}
-                className="mt-1 size-4 accent-[var(--brand-green)]"
-              />
-              <span className="flex flex-col">
-                <span className="text-base text-ink">{label}</span>
-                <span className="text-sm text-ink-muted">{hint}</span>
-              </span>
-            </label>
-          ))}
+      {/* --- Costo unitario --- */}
+      <label className="flex flex-col gap-2">
+        <span className="text-base font-medium text-ink">
+          Costo por unidad
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-semibold text-ink-muted">$</span>
+          <input
+            name="unit_cost"
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            value={priceValue}
+            onChange={(e) => setPriceValue(e.target.value)}
+            placeholder="0.75"
+            className={inputClass}
+          />
+          <span className="whitespace-nowrap text-base text-ink-muted">c/u</span>
         </div>
 
-        {/* Campo de precio activo */}
-        <label className="flex flex-col gap-1.5">
-          <span className="text-sm text-ink-muted">
-            {priceMode === "total"
-              ? "Total pagado (como viene en la factura)"
-              : "Precio por cada unidad"}
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-ink-muted">$</span>
-            <input
-              type="number"
-              step={priceMode === "total" ? "0.01" : "0.0001"}
-              min="0"
-              required
-              value={priceValue}
-              onChange={(e) => setPriceValue(e.target.value)}
-              placeholder={priceMode === "total" ? "18.00" : "0.75"}
-              className={inputClass}
-            />
-          </div>
-        </label>
-
-        {/* Cálculo derivado — solo informativo */}
-        {q > 0 && priceValue && !Number.isNaN(p) ? (
+        {/* Confirmación de lo que se va a guardar. */}
+        {totalCost != null && priceValue && !Number.isNaN(p) ? (
           <p className="rounded-lg bg-brand-cream/50 px-3.5 py-2 text-sm text-ink">
-            {priceMode === "total" ? (
-              <>
-                Costo por unidad:{" "}
-                <strong className="text-brand-green">
-                  ${unitCost?.toFixed(4)}
-                </strong>
-              </>
-            ) : (
-              <>
-                Total a pagar:{" "}
-                <strong className="text-brand-green">
-                  ${totalCost?.toFixed(2)}
-                </strong>
-              </>
-            )}
+            {q} unidad{q === 1 ? "" : "es"} × ${p.toFixed(2)} ={" "}
+            <strong className="text-brand-green">${totalCost.toFixed(2)}</strong>
           </p>
         ) : null}
-
-        {/* Hidden: mandamos siempre total_cost a la base */}
-        <input
-          type="hidden"
-          name="total_cost"
-          value={totalCost != null && !Number.isNaN(totalCost) ? totalCost.toFixed(2) : ""}
-        />
-      </fieldset>
+      </label>
 
       {/* --- Fecha y proveedor --- */}
       <div className="grid gap-4 sm:grid-cols-2">

@@ -85,7 +85,6 @@ export function BulkStockWizard({
   // --- Step 2: Cantidades y precios ---
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [prices, setPrices] = useState<Record<string, string>>({});
-  const [priceMode, setPriceMode] = useState<"total" | "unit">("total");
 
   // --- Step 3: Guardar ---
   const [purchasedAt, setPurchasedAt] = useState(
@@ -142,12 +141,13 @@ export function BulkStockWizard({
     return selected.has(rowKey(itemId, variantId));
   }
 
-  // Calcular total_cost por fila
+  // El precio que se escribe YA es el unitario; el total lo calcula la
+  // server action. Aquí solo se muestra como confirmación.
   function totalCostFor(key: string): number | null {
     const q = Number(quantities[key]);
     const p = Number(prices[key]);
     if (!q || !p || Number.isNaN(q) || Number.isNaN(p)) return null;
-    return priceMode === "total" ? p : p * q;
+    return p * q;
   }
 
   // Submit
@@ -156,12 +156,11 @@ export function BulkStockWizard({
       .filter((key) => quantities[key]?.trim() && prices[key]?.trim())
       .map((key) => {
         const [itemId, variantId] = key.split("::");
-        const tc = totalCostFor(key);
         return {
           itemId,
           variantId: variantId || null,
           quantity: quantities[key],
-          totalCost: tc != null ? tc.toFixed(2) : "",
+          unitCost: prices[key],
         };
       });
 
@@ -259,8 +258,6 @@ export function BulkStockWizard({
           setQuantities={setQuantities}
           prices={prices}
           setPrices={setPrices}
-          priceMode={priceMode}
-          setPriceMode={setPriceMode}
           totalCostFor={totalCostFor}
         />
       ) : null}
@@ -271,7 +268,6 @@ export function BulkStockWizard({
           selected={selected}
           quantities={quantities}
           prices={prices}
-          priceMode={priceMode}
           totalCostFor={totalCostFor}
           purchasedAt={purchasedAt}
           setPurchasedAt={setPurchasedAt}
@@ -734,8 +730,6 @@ function StepQuantities({
   setQuantities,
   prices,
   setPrices,
-  priceMode,
-  setPriceMode,
   totalCostFor,
 }: {
   selected: Map<string, SelectedEntry>;
@@ -743,8 +737,6 @@ function StepQuantities({
   setQuantities: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   prices: Record<string, string>;
   setPrices: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  priceMode: "total" | "unit";
-  setPriceMode: (mode: "total" | "unit") => void;
   totalCostFor: (key: string) => number | null;
 }) {
   const entries = [...selected.entries()];
@@ -756,37 +748,10 @@ function StepQuantities({
           Cantidades y precios
         </h2>
         <p className="mt-0.5 text-sm text-ink-muted">
-          Llena cantidad y precio para cada insumo. Deja en blanco los que no
-          apliquen.
+          Escribe cuántas unidades compraste y cuánto costó cada una. Deja en
+          blanco los que no apliquen.
         </p>
       </div>
-
-      {/* Modo de precio global */}
-      <fieldset className="flex gap-2">
-        <legend className="sr-only">Modo de precio</legend>
-        {(
-          [
-            ["total", "Precio total"],
-            ["unit", "Costo por unidad"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => {
-              setPriceMode(value);
-              setPrices({});
-            }}
-            className={`rounded-lg border-2 px-4 py-2 text-sm font-medium transition ${
-              priceMode === value
-                ? "border-brand-green bg-brand-green/10 text-brand-green"
-                : "border-line text-ink-muted hover:border-brand-teal/50"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </fieldset>
 
       <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full text-left text-base">
@@ -797,12 +762,8 @@ function StepQuantities({
                 Ya tiene
               </th>
               <th className="w-28 py-2 pr-3 font-medium">Cantidad</th>
-              <th className="w-32 py-2 pr-3 font-medium">
-                {priceMode === "total" ? "Precio total" : "Costo unit."}
-              </th>
-              <th className="w-28 py-2 pr-4 text-right font-medium">
-                {priceMode === "total" ? "Unit." : "Total"}
-              </th>
+              <th className="w-32 py-2 pr-3 font-medium">Costo unitario</th>
+              <th className="w-28 py-2 pr-4 text-right font-medium">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -811,10 +772,7 @@ function StepQuantities({
               const price = prices[key] ?? "";
               const q = Number(qty);
               const p = Number(price);
-              const derivedUnit =
-                priceMode === "total" && q > 0 && p > 0 ? p / q : null;
-              const derivedTotal =
-                priceMode === "unit" && q > 0 && p > 0 ? p * q : null;
+              const derivedTotal = q > 0 && p > 0 ? p * q : null;
 
               return (
                 <tr key={key} className="border-b border-line-soft">
@@ -837,8 +795,10 @@ function StepQuantities({
                     <input
                       type="number"
                       min="0"
-                      step="0.001"
-                      inputMode="decimal"
+                      // Entero: con step="0.001" las flechitas del spinner
+                      // dejaban cantidades como 19.999 en vez de 20.
+                      step="1"
+                      inputMode="numeric"
                       value={qty}
                       onChange={(e) =>
                         setQuantities((prev) => ({
@@ -856,7 +816,7 @@ function StepQuantities({
                       <input
                         type="number"
                         min="0"
-                        step={priceMode === "total" ? "0.01" : "0.0001"}
+                        step="0.01"
                         inputMode="decimal"
                         value={price}
                         onChange={(e) =>
@@ -871,11 +831,7 @@ function StepQuantities({
                     </div>
                   </td>
                   <td className="py-2 pr-4 text-right text-sm text-ink-muted">
-                    {priceMode === "total" && derivedUnit != null
-                      ? `$${derivedUnit.toFixed(4)}`
-                      : priceMode === "unit" && derivedTotal != null
-                        ? `$${derivedTotal.toFixed(2)}`
-                        : "—"}
+                    {derivedTotal != null ? `$${derivedTotal.toFixed(2)}` : "—"}
                   </td>
                 </tr>
               );
@@ -904,7 +860,6 @@ function StepConfirm({
   selected: Map<string, SelectedEntry>;
   quantities: Record<string, string>;
   prices: Record<string, string>;
-  priceMode: "total" | "unit";
   totalCostFor: (key: string) => number | null;
   purchasedAt: string;
   setPurchasedAt: (v: string) => void;

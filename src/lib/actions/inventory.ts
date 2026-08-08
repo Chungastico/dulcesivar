@@ -9,21 +9,30 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 export type ActionState = { error?: string; ok?: string };
 
 /**
- * Se captura cantidad y precio TOTAL porque es como llega la información real:
- * una factura dice "$18 por 24 chocolates", no el unitario. La división la
- * hace la base de datos, así no se guardan redondeos hechos a mano.
+ * Se captura cantidad y COSTO UNITARIO. La tabla guarda el total pagado (y de
+ * ahí Postgres deriva unit_cost), pero esa multiplicación se hace una sola vez,
+ * aquí abajo, justo antes de insertar.
+ *
+ * Antes los formularios ofrecían escribir el precio total o el unitario, a
+ * elección. Se quitó: era una decisión de más en cada carga, y tener dos
+ * caminos hacia la misma columna abría la puerta a que se contradijeran.
  */
 const purchaseSchema = z.object({
   item_id: z.string().uuid("Elige un insumo de la lista"),
   // "" (sin variante) se normaliza a null antes de llegar aquí, para que la
   // validación uuid no reviente con un insumo que no tiene colores.
   variant_id: z.string().uuid().nullable(),
+  // Entera: se compran 20 cajas, no 19.999. Las cantidades rotas que había en
+  // la base venían del spinner de un <input step="0.001">, no de nadie
+  // escribiéndolas. Si algún día entra un insumo que se compra por peso, este
+  // es el punto a relajar (ver supabase/migrations/008_cantidades_enteras.sql).
   quantity: z.coerce
     .number({ message: "La cantidad es obligatoria" })
+    .int("La cantidad debe ser un número entero")
     .positive("La cantidad debe ser mayor que cero")
     .max(1_000_000),
-  total_cost: z.coerce
-    .number({ message: "El precio total es obligatorio" })
+  unit_cost: z.coerce
+    .number({ message: "El precio por unidad es obligatorio" })
     .min(0, "El precio no puede ser negativo")
     .max(1_000_000),
   purchase_type: z.enum(["mayoreo", "individual"]).default("individual"),
@@ -44,7 +53,7 @@ export async function registerPurchase(
     item_id: formData.get("item_id"),
     variant_id: rawVariant || null,
     quantity: formData.get("quantity"),
-    total_cost: formData.get("total_cost"),
+    unit_cost: formData.get("unit_cost"),
     purchase_type: formData.get("purchase_type"),
     supplier: String(formData.get("supplier") ?? "").trim() || undefined,
     purchased_at: formData.get("purchased_at"),
@@ -61,7 +70,7 @@ export async function registerPurchase(
       item_id: parsed.data.item_id,
       variant_id: parsed.data.variant_id,
       quantity: parsed.data.quantity,
-      total_cost: parsed.data.total_cost,
+      total_cost: parsed.data.unit_cost * parsed.data.quantity,
       purchase_type: parsed.data.purchase_type,
       supplier: parsed.data.supplier ?? null,
       purchased_at: parsed.data.purchased_at,
@@ -82,8 +91,8 @@ export async function registerPurchase(
   revalidatePath("/admin/inventario");
   revalidatePath("/admin/catalogo");
 
-  const unit = parsed.data.total_cost / parsed.data.quantity;
-  return { ok: `Compra registrada. Costo unitario: $${unit.toFixed(2)}` };
+  const total = parsed.data.unit_cost * parsed.data.quantity;
+  return { ok: `Compra registrada. Total: $${total.toFixed(2)}` };
 }
 
 /**
@@ -178,6 +187,68 @@ export async function deleteVariant(variantId: string): Promise<ActionState> {
   return { ok: "Color eliminado." };
 }
 
+/**
+ * Renombra un insumo de la biblioteca (la fila de content_presets, no un
+ * color). El historial de compras y los colores no se tocan: solo cambia la
+ * etiqueta con la que se muestra en todos lados.
+ */
+export async function renameInventoryItem(
+  itemId: string,
+  label: string,
+): Promise<ActionState> {
+  await requireAdmin();
+
+  const trimmed = label.trim();
+  if (trimmed.length < 2) {
+    return { error: "El nombre debe tener al menos 2 caracteres." };
+  }
+
+  const { error } = await supabaseAdmin()
+    .from("content_presets")
+    .update({ label: trimmed })
+    .eq("id", itemId);
+
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "Ya existe un insumo con ese nombre."
+          : error.message,
+    };
+  }
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/inventario/carga-inicial");
+  revalidatePath("/admin/catalogo");
+  return { ok: `Insumo renombrado a "${trimmed}".` };
+}
+
+/**
+ * Elimina un insumo completo de la biblioteca. Por las FK de la base:
+ * - Sus compras (inventory_purchases) se borran en cascada.
+ * - Sus colores (content_preset_variants) se borran en cascada.
+ * - Si aparece en el "qué incluye" de algún producto (product_contents),
+ *   ese ítem no se borra: solo pierde el enlace al insumo (preset_id -> null)
+ *   y queda como texto suelto, sin costo.
+ * El caller es responsable de confirmar con la usuaria antes de llamar esto,
+ * ya que no se puede deshacer.
+ */
+export async function deleteInventoryItem(itemId: string): Promise<ActionState> {
+  await requireAdmin();
+
+  const { error } = await supabaseAdmin()
+    .from("content_presets")
+    .delete()
+    .eq("id", itemId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/inventario/carga-inicial");
+  revalidatePath("/admin/catalogo");
+  return { ok: "Insumo eliminado." };
+}
+
 // ---------------------------------------------------------------------------
 // Carga inicial: registrar muchos insumos de una vez.
 //
@@ -199,8 +270,12 @@ export async function deleteVariant(variantId: string): Promise<ActionState> {
 const bulkRowSchema = z.object({
   itemId: z.string().uuid(),
   variantId: z.string().uuid().nullable(),
-  quantity: z.coerce.number().positive().max(1_000_000),
-  totalCost: z.coerce.number().min(0).max(1_000_000),
+  quantity: z.coerce
+    .number()
+    .int("las cantidades deben ser números enteros")
+    .positive()
+    .max(1_000_000),
+  unitCost: z.coerce.number().min(0).max(1_000_000),
 });
 
 const bulkMetaSchema = z.object({
@@ -215,7 +290,8 @@ export type BulkRow = {
   /** null = fila del insumo base; un id = fila de un color específico. */
   variantId: string | null;
   quantity: string;
-  totalCost: string;
+  /** Lo que cuesta UNA unidad. El total lo calcula esta acción. */
+  unitCost: string;
 };
 export type BulkMeta = {
   purchasedAt: string;
@@ -239,7 +315,7 @@ export async function bulkRegisterInventory(
   // inventado a la baja arrastraría el promedio ponderado de ese insumo hacia
   // abajo y mentiría en el margen de cada regalo que lo use.
   const candidates = rows.filter(
-    (r) => r.quantity.trim() !== "" && r.totalCost.trim() !== "",
+    (r) => r.quantity.trim() !== "" && r.unitCost.trim() !== "",
   );
   const skipped = rows.length - candidates.length;
 
@@ -266,7 +342,9 @@ export async function bulkRegisterInventory(
     item_id: row.itemId,
     variant_id: row.variantId,
     quantity: row.quantity,
-    total_cost: row.totalCost,
+    // Único lugar del proyecto donde se calcula un total. Los formularios solo
+    // piden el unitario.
+    total_cost: row.unitCost * row.quantity,
     purchase_type: parsedMeta.data.purchaseType,
     supplier: parsedMeta.data.supplier ?? null,
     purchased_at: parsedMeta.data.purchasedAt,
@@ -285,6 +363,115 @@ export async function bulkRegisterInventory(
     }`,
     saved: good.length,
     skipped,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Corregir el stock y el costo de un insumo a mano.
+//
+// A diferencia de registrarPurchase/bulkRegisterInventory, esto NO suma al
+// historial: lo REEMPLAZA. Lo que quede escrito en el modal es exactamente lo
+// que va a tener el insumo.
+//
+// Es una decisión deliberada para esta etapa: ella está cargando el catálogo
+// por primera vez y necesita poder corregir un número mal escrito sin pelear
+// contra un promedio ponderado que arrastra el error anterior. El costo es que
+// se pierde el detalle de compras previas de ese insumo (fechas, proveedores).
+// Cuando el catálogo esté estable, el camino correcto vuelve a ser registrar
+// compras y dejar que el promedio haga su trabajo.
+// ---------------------------------------------------------------------------
+
+/** Igual que bulkRowSchema pero admite 0 = "no tengo ninguna". */
+const levelRowSchema = z.object({
+  itemId: z.string().uuid(),
+  variantId: z.string().uuid().nullable(),
+  quantity: z.coerce
+    .number()
+    .int("las cantidades deben ser números enteros")
+    .min(0)
+    .max(1_000_000),
+  unitCost: z.coerce.number().min(0).max(1_000_000),
+});
+
+export async function setInventoryLevels(
+  itemId: string,
+  rows: BulkRow[],
+  meta: { purchasedAt: string },
+): Promise<BulkResult> {
+  await requireAdmin();
+
+  if (!meta.purchasedAt?.trim()) return { error: "Falta la fecha." };
+
+  // Se valida TODO antes de tocar la base: si un número está mal, se sale sin
+  // haber borrado nada.
+  const validated = rows.map((r) => levelRowSchema.safeParse(r));
+  const bad = validated.find((v) => !v.success);
+  if (bad && !bad.success) {
+    return { error: `Revisa los números: ${bad.error.issues[0].message}` };
+  }
+
+  const good = validated
+    .filter((v): v is { success: true; data: z.infer<typeof levelRowSchema> } => v.success)
+    .map((v) => v.data);
+
+  const db = supabaseAdmin();
+
+  // Las compras que hay ahora. Se capturan sus ids ANTES de insertar para
+  // borrar exactamente esas y ninguna nueva.
+  const { data: previous, error: readError } = await db
+    .from("inventory_purchases")
+    .select("id")
+    .eq("item_id", itemId);
+
+  if (readError) return { error: readError.message };
+  const previousIds = (previous ?? []).map((p) => p.id);
+
+  // Una cantidad en 0 significa "no tengo ninguna": no se inserta fila.
+  const payload = good
+    .filter((row) => row.quantity > 0)
+    .map((row) => ({
+      item_id: itemId,
+      variant_id: row.variantId,
+      quantity: row.quantity,
+      total_cost: row.unitCost * row.quantity,
+      purchase_type: "inicial" as const,
+      supplier: null,
+      purchased_at: meta.purchasedAt,
+      notes: "Ajuste manual de stock y costo",
+    }));
+
+  // Insertar primero y borrar después: si el insert falla, el dato viejo sigue
+  // intacto. Al revés, un fallo a mitad de camino dejaría el insumo en cero.
+  if (payload.length > 0) {
+    const { error: insertError } = await db
+      .from("inventory_purchases")
+      .insert(payload);
+    if (insertError) return { error: insertError.message };
+  }
+
+  if (previousIds.length > 0) {
+    const { error: deleteError } = await db
+      .from("inventory_purchases")
+      .delete()
+      .in("id", previousIds);
+
+    // El dato nuevo ya entró; lo que falló fue limpiar lo viejo. Se avisa en
+    // vez de callarlo, porque el insumo queda con el stock duplicado.
+    if (deleteError) {
+      return {
+        error:
+          "Se guardó el valor nuevo, pero no se pudo borrar el anterior: " +
+          `${deleteError.message}. El insumo quedó con el stock duplicado.`,
+      };
+    }
+  }
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/catalogo");
+
+  return {
+    ok: payload.length > 0 ? "Valores actualizados." : "Insumo dejado sin stock.",
+    saved: payload.length,
   };
 }
 

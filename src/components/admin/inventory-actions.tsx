@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 import { Modal } from "@/components/admin/modal";
@@ -39,12 +38,10 @@ export function InventoryActions({
         >
           + Registrar compra
         </button>
-        <Link
-          href="/admin/inventario/carga-inicial"
-          className="rounded-lg bg-brand-orange px-4 py-2.5 text-base font-semibold text-ink transition hover:brightness-95"
-        >
-          Cargar varios a la vez
-        </Link>
+        {/* "Cargar varios a la vez" (/admin/inventario/carga-inicial) quedó
+            fuera de la barra: el wizard de 3 pasos resultó más engorroso que
+            abrir el insumo y escribirle cantidad y precio ahí mismo. La página
+            y el wizard siguen en el repo por si hace falta recuperarlos. */}
         <button
           type="button"
           onClick={() => setOpenNewItem(true)}
@@ -58,7 +55,7 @@ export function InventoryActions({
         open={openPurchase}
         onClose={() => setOpenPurchase(false)}
         title="Registrar compra"
-        description="Escribe el precio como venga en la factura: total pagado o costo por unidad. El otro se calcula solo."
+        description="Anota cuántas unidades compraste y cuánto costó cada una."
         wide
       >
         <PurchaseForm
