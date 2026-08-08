@@ -11,9 +11,46 @@ export type CatalogProduct = Product & {
   product_attributes: { value_id: string }[];
 };
 
+export type BudgetTierId = "esencial" | "especial" | "premium" | "exclusivo";
+
+export type BudgetTier = {
+  id: BudgetTierId;
+  name: string;
+  priceLabel: string;
+  min: number;
+  max: number;
+};
+
+export const BUDGET_PARAM = "presupuesto";
+
+export const BUDGET_TIERS: BudgetTier[] = [
+  { id: "esencial", name: "Sivar Esencial", priceLabel: "$5.00 a $20.00", min: 5, max: 20 },
+  { id: "especial", name: "Sivar Especial", priceLabel: "$21.00 a $35.00", min: 21, max: 35 },
+  { id: "premium", name: "Sivar Premium", priceLabel: "$36.00 a $50.00", min: 36, max: 50 },
+  { id: "exclusivo", name: "Sivar Exclusivo", priceLabel: "$51.00 a $85.00", min: 51, max: 85 },
+];
+
+export function productMatchesTier(
+  price: number | null,
+  tierId: BudgetTierId,
+): boolean {
+  if (price == null) return false;
+  switch (tierId) {
+    case "esencial":
+      return price <= 20;
+    case "especial":
+      return price > 20 && price <= 35;
+    case "premium":
+      return price > 35 && price <= 50;
+    case "exclusivo":
+      return price > 50;
+  }
+}
+
 export type Filters = {
   /** Slugs elegidos por eje. */
   byGroup: Record<string, string[]>;
+  budget: BudgetTierId[];
   min: number | null;
   max: number | null;
   query: string;
@@ -55,6 +92,7 @@ export function parseFilters(
   const byGroup: Record<string, string[]> = {};
 
   for (const group of groups) {
+    if (group.slug === BUDGET_PARAM) continue;
     // Solo se aceptan slugs que existan en el eje: así una URL manipulada o un
     // enlace viejo con una opción ya borrada no rompe nada ni filtra a cero.
     const valid = new Set(
@@ -64,12 +102,19 @@ export function parseFilters(
     if (chosen.length) byGroup[group.slug] = chosen;
   }
 
+  const rawBudget = readList(params[BUDGET_PARAM]);
+  const validBudget = new Set<string>(BUDGET_TIERS.map((t) => t.id));
+  const budget = rawBudget
+    .map((b) => b.toLowerCase().replace(/^sivar-/, "").replace("premiun", "premium"))
+    .filter((b): b is BudgetTierId => validBudget.has(b));
+
   const sortRaw = Array.isArray(params[SORT_PARAM])
     ? params[SORT_PARAM][0]
     : params[SORT_PARAM];
 
   return {
     byGroup,
+    budget,
     min: readNumber(params[PRICE_MIN_PARAM]),
     max: readNumber(params[PRICE_MAX_PARAM]),
     query: (Array.isArray(params[QUERY_PARAM])
@@ -83,6 +128,7 @@ export function parseFilters(
 export function activeFilterCount(filters: Filters): number {
   return (
     Object.values(filters.byGroup).reduce((n, list) => n + list.length, 0) +
+    filters.budget.length +
     (filters.min != null ? 1 : 0) +
     (filters.max != null ? 1 : 0) +
     (filters.query ? 1 : 0)
@@ -92,7 +138,7 @@ export function activeFilterCount(filters: Filters): number {
 function normalize(text: string): string {
   return text
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
 
@@ -100,9 +146,8 @@ function normalize(text: string): string {
  * Aplica los filtros.
  *
  * Dentro de un eje las opciones suman (bodas O aniversario); entre ejes se
- * exigen todas (bodas Y con flores). Es como se comporta cualquier tienda:
- * marcar dos ocasiones amplía la búsqueda, marcar una ocasión y un contenido
- * la restringe.
+ * exigen todas (bodas Y con flores). El presupuesto se calcula automáticamente
+ * a partir de product.price_usd sin necesidad de clasificar a mano.
  */
 export function applyFilters(
   products: CatalogProduct[],
@@ -121,13 +166,18 @@ export function applyFilters(
       if (wanted.length && !wanted.some((id) => owned.has(id))) return false;
     }
 
+    if (filters.budget.length > 0) {
+      const inBudget = filters.budget.some((tierId) =>
+        productMatchesTier(product.price_usd, tierId),
+      );
+      if (!inBudget) return false;
+    }
+
     const price = product.price_usd;
     if (filters.min != null && (price == null || price < filters.min)) return false;
     if (filters.max != null && (price == null || price > filters.max)) return false;
 
     if (needle) {
-      // También busca dentro de lo que incluye: quien escribe "peluche" espera
-      // encontrar las cajas que lo traen, no solo las que lo llevan en el nombre.
       const haystack = normalize(
         [
           product.name,
@@ -161,7 +211,6 @@ function sortProducts(
     case "nuevos":
       return copy.sort((a, b) => b.created_at.localeCompare(a.created_at));
     default:
-      // Los destacados primero; dentro de cada grupo, lo más nuevo arriba.
       return copy.sort(
         (a, b) =>
           Number(b.is_featured) - Number(a.is_featured) ||
@@ -172,8 +221,7 @@ function sortProducts(
 
 /**
  * Cuenta cuántos productos quedarían al marcar cada opción, respetando los
- * demás filtros activos. Sin esto la clienta vería opciones que llevan a cero
- * resultados, que es el defecto clásico de los filtros sin conteo.
+ * demás filtros activos.
  */
 export function facetCounts(
   products: CatalogProduct[],
@@ -184,6 +232,7 @@ export function facetCounts(
   const counts = new Map<string, number>();
 
   for (const group of groups) {
+    if (group.slug === BUDGET_PARAM) continue;
     const others: Filters = {
       ...filters,
       byGroup: Object.fromEntries(
@@ -202,6 +251,30 @@ export function facetCounts(
           .length,
       );
     }
+  }
+
+  return counts;
+}
+
+/**
+ * Cuenta cuántos productos hay en cada rango de presupuesto según su precio real.
+ */
+export function budgetFacetCounts(
+  products: CatalogProduct[],
+  filters: Filters,
+  slugToId: Map<string, string>,
+): Map<BudgetTierId, number> {
+  const others: Filters = {
+    ...filters,
+    budget: [],
+    sort: "relevancia",
+  };
+  const base = applyFilters(products, others, slugToId);
+  const counts = new Map<BudgetTierId, number>();
+
+  for (const tier of BUDGET_TIERS) {
+    const count = base.filter((p) => productMatchesTier(p.price_usd, tier.id)).length;
+    counts.set(tier.id, count);
   }
 
   return counts;

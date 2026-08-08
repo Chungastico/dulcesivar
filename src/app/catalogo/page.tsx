@@ -5,6 +5,8 @@ import { FilterSidebar } from "@/components/catalog/filter-sidebar";
 import { ProductCard } from "@/components/catalog/product-card";
 import {
   applyFilters,
+  budgetFacetCounts,
+  BUDGET_PARAM,
   facetCounts,
   parseFilters,
   type CatalogProduct,
@@ -16,7 +18,7 @@ import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 export const metadata: Metadata = {
   title: "Catálogo",
   description:
-    "Explora los regalos de Dulce Sivar por ocasión, tipo de caja, contenido y presupuesto.",
+    "Explora los regalos de DulceSivar por ocasión, tipo de caja, contenido y presupuesto.",
 };
 
 export default async function CatalogoPage({
@@ -39,8 +41,13 @@ export default async function CatalogoPage({
       .eq("is_active", true),
   ]);
 
-  const groups = (groupsResult.data ?? []) as AttributeGroupWithValues[];
+  const rawGroups = (groupsResult.data ?? []) as AttributeGroupWithValues[];
   const products = (productsResult.data ?? []) as CatalogProduct[];
+
+  // El presupuesto ahora se calcula automáticamente a partir de product.price_usd.
+  // Si en la base de datos aún existe una categoría manual llamada "Presupuesto",
+  // la excluimos para no duplicarla mientras el administrador la elimina.
+  const groups = rawGroups.filter((g) => g.slug !== BUDGET_PARAM);
 
   const slugToId = new Map<string, string>();
   for (const group of groups) {
@@ -52,14 +59,7 @@ export default async function CatalogoPage({
   const filters = parseFilters(params, groups);
   const visible = applyFilters(products, filters, slugToId);
   const counts = facetCounts(products, filters, groups, slugToId);
-
-  const prices = products
-    .map((p) => p.price_usd)
-    .filter((p): p is number => p != null);
-  const priceBounds = {
-    min: prices.length ? Math.floor(Math.min(...prices)) : 0,
-    max: prices.length ? Math.ceil(Math.max(...prices)) : 0,
-  };
+  const budgetCounts = budgetFacetCounts(products, filters, slugToId);
 
   const publicUrlBase = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
 
@@ -75,7 +75,7 @@ export default async function CatalogoPage({
             groups={groups}
             filters={filters}
             counts={counts}
-            priceBounds={priceBounds}
+            budgetCounts={budgetCounts}
             total={products.length}
             shown={visible.length}
           />
@@ -95,7 +95,7 @@ export default async function CatalogoPage({
                 Ningún regalo coincide con esos filtros.
               </p>
               <p className="text-base text-ink-muted">
-                Prueba quitando alguno o ampliando el rango de precio.
+                Prueba quitando algún filtro o seleccionando otro rango de presupuesto.
               </p>
             </div>
           ) : (

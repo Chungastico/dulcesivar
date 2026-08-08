@@ -94,7 +94,7 @@ export function InventoryBrowser({
 
         {categories.length === 0 ? (
           <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-base text-ink-muted">
-            Ningún insumo coincide con «{query}».
+            Ningún insumo coincide con "{query}".
           </p>
         ) : (
           <ul className="flex flex-col gap-2">
@@ -412,7 +412,7 @@ function AddColorForm({
         setError(res.error);
       } else if (res.id) {
         onCreated({ id: res.id, name: name.trim() });
-        setSuccess(`Color «${name.trim()}» agregado`);
+        setSuccess(`Color "${name.trim()}" agregado`);
         setName("");
       }
     });

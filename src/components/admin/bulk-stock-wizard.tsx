@@ -356,7 +356,7 @@ function StepSelectItems({
 
       {byCategory.length === 0 ? (
         <p className="rounded-xl border border-dashed border-line px-4 py-10 text-center text-base text-ink-muted">
-          Ningún insumo coincide con «{query}».
+          Ningún insumo coincide con "{query}".
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

@@ -264,7 +264,7 @@ function NewGroupForm() {
           Nueva categoría de clasificación
         </p>
         <p className="text-xs text-ink-muted">
-          Ej. «Temporada», «Color», «Presupuesto». Se vuelve un filtro nuevo.
+          Ej. Temporada, Color, Ocasión. Se vuelve un filtro nuevo.
         </p>
       </div>
       <input
@@ -274,7 +274,7 @@ function NewGroupForm() {
         placeholder="Nombre de la categoría"
         className="min-w-48 rounded-lg border border-line bg-surface-raised px-3 py-1.5 text-sm text-ink placeholder:text-ink-muted/60 focus:border-brand-teal focus:outline-none"
       />
-      <SubmitButton label="Crear categoría" />
+      <SubmitButton label="Crear categoria" />
       {state.error ? (
         <span className="text-xs text-red-700">{state.error}</span>
       ) : null}

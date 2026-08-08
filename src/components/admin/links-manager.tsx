@@ -143,7 +143,7 @@ function SortableRow({
         type="button"
         {...attributes}
         {...listeners}
-        aria-label={`Arrastrar «${value.name}» para reordenar`}
+        aria-label={`Arrastrar "${value.name}" para reordenar`}
         className="touch-none cursor-grab rounded p-1 text-ink-muted transition hover:text-brand-green active:cursor-grabbing"
       >
         <GripVertical className="size-5" aria-hidden />

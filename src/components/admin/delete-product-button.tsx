@@ -29,7 +29,7 @@ export function DeleteProductButton({
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3">
       <span className="text-sm text-red-800">
-        ¿Eliminar «{productName}» definitivamente?
+        ¿Eliminar "{productName}" definitivamente?
       </span>
       <button
         type="button"

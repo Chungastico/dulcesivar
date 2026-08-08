@@ -24,7 +24,7 @@ import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 export const metadata: Metadata = {
   title: "Enlaces",
   description:
-    "Elige la ocasión y te llevamos directo a esos regalos en el catálogo de Dulce Sivar.",
+    "Elige la ocasión y te llevamos directo a esos regalos en el catálogo de DulceSivar.",
 };
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP ?? "50376815829";
@@ -99,14 +99,14 @@ export default async function EnlacesPage() {
               no necesita el optimizador de next/image. */}
           <img
             src="/logo.svg"
-            alt="Dulce Sivar"
+            alt="DulceSivar"
             className="h-full w-full object-contain"
           />
         </div>
 
         <div className="flex flex-col items-center gap-1.5 text-center">
           <h1 className="text-2xl font-bold text-white sm:text-3xl">
-            Dulce Sivar
+            DulceSivar
           </h1>
           <p className="max-w-xs text-balance text-base text-brand-cream/90">
             ¿Qué estás celebrando? Elige la ocasión y te llevamos directo a

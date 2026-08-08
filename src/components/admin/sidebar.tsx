@@ -6,11 +6,11 @@ import { useState } from "react";
 
 type NavItem = {
   href:
-    | "/admin"
-    | "/admin/catalogo"
-    | "/admin/categorias"
-    | "/admin/inventario"
-    | "/admin/links";
+  | "/admin"
+  | "/admin/catalogo"
+  | "/admin/categorias"
+  | "/admin/inventario"
+  | "/admin/links";
   label: string;
   icon: React.ReactNode;
 };
@@ -38,7 +38,7 @@ export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
         >
           <IconMenu />
         </button>
-        <span className="font-semibold">Dulce Sivar</span>
+        <span className="font-semibold">DulceSivar</span>
       </div>
 
       {open ? (
@@ -57,7 +57,7 @@ export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
         <div className="flex items-center justify-between px-5 py-5">
           <Link href="/admin" className="flex flex-col" onClick={() => setOpen(false)}>
             <span className="text-lg font-semibold text-white">
-              Dulce Sivar
+              DulceSivar
             </span>
             <span className="text-xs text-brand-lime">Panel de administración</span>
           </Link>
@@ -113,8 +113,8 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${active
-          ? "bg-white/15 font-medium text-white"
-          : "text-white/70 hover:bg-white/10 hover:text-white"
+        ? "bg-white/15 font-medium text-white"
+        : "text-white/70 hover:bg-white/10 hover:text-white"
         }`}
     >
       {/* Barra lima a la izquierda: el estado activo no depende solo del

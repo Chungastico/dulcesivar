@@ -166,7 +166,7 @@ export function PurchaseForm({
                       ))
                     ) : (
                       <li className="px-4 py-3 text-sm text-ink-muted">
-                        Ningún insumo coincide con «{query}».
+                        Ningún insumo coincide con "{query}".
                       </li>
                     )}
                   </ul>

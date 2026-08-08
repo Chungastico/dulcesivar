@@ -5,9 +5,10 @@ import { useState } from "react";
 
 import {
   activeFilterCount,
-  PRICE_MAX_PARAM,
-  PRICE_MIN_PARAM,
+  BUDGET_PARAM,
+  BUDGET_TIERS,
   QUERY_PARAM,
+  type BudgetTierId,
   type Filters,
 } from "@/lib/catalog-filters";
 import type { AttributeGroupWithValues } from "@/lib/supabase/types";
@@ -22,22 +23,19 @@ function FilterControls({
   groups,
   filters,
   counts,
-  priceBounds,
+  budgetCounts,
   total,
 }: {
   groups: AttributeGroupWithValues[];
   filters: Filters;
   counts: Map<string, number>;
-  priceBounds: { min: number; max: number };
+  budgetCounts: Map<BudgetTierId, number>;
   total: number;
   shown?: number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-
-  const [minDraft, setMinDraft] = useState(filters.min?.toString() ?? "");
-  const [maxDraft, setMaxDraft] = useState(filters.max?.toString() ?? "");
 
   function push(next: URLSearchParams) {
     const qs = next.toString();
@@ -60,12 +58,19 @@ function FilterControls({
     push(next);
   }
 
-  function applyPrice() {
+  function toggleBudget(tierId: BudgetTierId) {
     const next = new URLSearchParams(params.toString());
-    if (minDraft.trim()) next.set(PRICE_MIN_PARAM, minDraft.trim());
-    else next.delete(PRICE_MIN_PARAM);
-    if (maxDraft.trim()) next.set(PRICE_MAX_PARAM, maxDraft.trim());
-    else next.delete(PRICE_MAX_PARAM);
+    const current = (next.get(BUDGET_PARAM) ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const updated = current.includes(tierId)
+      ? current.filter((s) => s !== tierId)
+      : [...current, tierId];
+
+    if (updated.length) next.set(BUDGET_PARAM, updated.join(","));
+    else next.delete(BUDGET_PARAM);
     push(next);
   }
 
@@ -80,6 +85,7 @@ function FilterControls({
 
   const hasFacets =
     Object.keys(filters.byGroup).length > 0 ||
+    filters.budget.length > 0 ||
     filters.min != null ||
     filters.max != null;
 
@@ -103,43 +109,45 @@ function FilterControls({
         )}
       </div>
 
+      {/* Filtro automático de Presupuesto calculado a partir del precio */}
       <section className="flex flex-col gap-2 border-t border-line-soft pt-4">
-        <h3 className="text-sm font-semibold text-ink">Precio</h3>
-        <p className="text-sm text-ink-muted">
-          Entre ${priceBounds.min} y ${priceBounds.max}
-        </p>
-        <div className="mt-1 flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            inputMode="decimal"
-            value={minDraft}
-            onChange={(e) => setMinDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && applyPrice()}
-            placeholder="Mín"
-            aria-label="Precio mínimo"
-            className={priceInput}
-          />
-          <span className="text-ink-muted">–</span>
-          <input
-            type="number"
-            min={0}
-            inputMode="decimal"
-            value={maxDraft}
-            onChange={(e) => setMaxDraft(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && applyPrice()}
-            placeholder="Máx"
-            aria-label="Precio máximo"
-            className={priceInput}
-          />
-          <button
-            type="button"
-            onClick={applyPrice}
-            className="rounded-lg border-2 border-line px-3 py-2 text-sm font-medium text-ink transition hover:border-brand-teal hover:bg-brand-teal/10"
-          >
-            Ir
-          </button>
-        </div>
+        <h3 className="text-sm font-semibold text-ink">Presupuesto</h3>
+        <ul className="flex flex-col">
+          {BUDGET_TIERS.map((tier) => {
+            const count = budgetCounts.get(tier.id) ?? 0;
+            const on = filters.budget.includes(tier.id);
+            const dead = count === 0 && !on;
+
+            return (
+              <li key={tier.id}>
+                <label
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-base transition ${
+                    dead
+                      ? "cursor-not-allowed text-ink-muted/60"
+                      : "text-ink hover:bg-brand-cream/50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={on}
+                    disabled={dead}
+                    onChange={() => toggleBudget(tier.id)}
+                    className="size-4 accent-[var(--brand-green)]"
+                  />
+                  <span className="flex flex-1 items-baseline justify-between gap-1">
+                    <span className={on ? "font-medium text-ink" : "text-ink"}>
+                      {tier.name}
+                      <span className="ml-1.5 text-xs text-ink-muted">
+                        ({tier.priceLabel})
+                      </span>
+                    </span>
+                    <span className="text-sm text-ink-muted">{count}</span>
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {groups.map((group) => {
@@ -194,22 +202,14 @@ function FilterControls({
   );
 }
 
-const priceInput =
-  "w-full min-w-0 rounded-lg border-2 border-line bg-surface-raised px-2.5 py-2 text-base text-ink placeholder:text-ink-muted focus:border-brand-teal focus:outline-none";
-
 /**
  * Presentación responsiva de los filtros.
- *
- * En escritorio son una columna fija. En móvil no pueden serlo: apilados
- * medían 1546 px y empujaban el primer producto a 1864 px, o sea más de dos
- * pantallas de scroll antes de ver un solo regalo. Ahí pasan a un panel que se
- * abre sobre el contenido, con los productos visibles de entrada.
  */
 export function FilterSidebar(props: {
   groups: AttributeGroupWithValues[];
   filters: Filters;
   counts: Map<string, number>;
-  priceBounds: { min: number; max: number };
+  budgetCounts: Map<BudgetTierId, number>;
   total: number;
   shown: number;
 }) {
@@ -254,11 +254,6 @@ export function FilterSidebar(props: {
         />
       ) : null}
 
-      {/* Panel sobre el contenido en móvil; columna fija en escritorio.
-          La visibilidad se controla con display y no con translate: la clase
-          condicional de translate no ganaba sobre la variante lg y el panel se
-          quedaba fuera de pantalla aunque estuviera "abierto". Se pierde el
-          deslizamiento, que era decorativo. */}
       <aside
         className={`${
           open ? "flex" : "hidden"
