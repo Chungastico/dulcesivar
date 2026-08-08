@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Award,
-  AtSign,
   Baby,
   Briefcase,
   Cake,
@@ -15,10 +14,10 @@ import {
   HandHeart,
   Heart,
   type LucideIcon,
-  MessageCircle,
   Sparkles,
 } from "lucide-react";
 
+import { InstagramIcon, WhatsAppIcon } from "@/components/icons/social";
 import { supabasePublic } from "@/lib/supabase/public";
 import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 
@@ -173,18 +172,18 @@ export default async function EnlacesPage() {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Escríbenos por WhatsApp"
-            className="flex size-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/25 transition hover:bg-white/20"
+            className="flex size-12 items-center justify-center rounded-full bg-[#25D366] text-white shadow-md transition hover:brightness-110 active:brightness-95"
           >
-            <MessageCircle className="size-5" aria-hidden />
+            <WhatsAppIcon className="size-5" />
           </a>
           <a
             href={INSTAGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="Síguenos en Instagram"
-            className="flex size-12 items-center justify-center rounded-full bg-white/10 text-white ring-1 ring-white/25 transition hover:bg-white/20"
+            className="flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-[#feda75] via-[#d62976] to-[#4f5bd5] text-white shadow-md transition hover:brightness-110 active:brightness-95"
           >
-            <AtSign className="size-5" aria-hidden />
+            <InstagramIcon className="size-5" />
           </a>
         </div>
 

@@ -14,7 +14,9 @@ const nameSchema = z.string().trim().min(2, "El nombre es obligatorio").max(80);
 function revalidateAll() {
   revalidatePath("/admin/categorias");
   revalidatePath("/admin/catalogo");
+  revalidatePath("/admin/links");
   revalidatePath("/catalogo");
+  revalidatePath("/enlaces");
 }
 
 function duplicateMessage(error: { code?: string; message: string }, what: string) {
@@ -165,5 +167,45 @@ export async function deleteValue(valueId: string) {
     .delete()
     .eq("id", valueId);
   if (error) throw new Error(error.message);
+  revalidateAll();
+}
+
+/**
+ * Reescribe el sort_order completo de un eje según el arrastre que hizo el
+ * admin en /admin/links. Es el mismo campo que usa el filtro del catálogo,
+ * así que reordenar ahí también reordena el sidebar de filtros: no hay una
+ * copia separada del orden solo para esta pantalla.
+ */
+export async function reorderValues(groupId: string, orderedIds: string[]) {
+  await requireAdmin();
+  const db = supabaseAdmin();
+
+  // Nunca se confía en la lista tal cual llega del cliente: se verifica que
+  // cada id sea realmente de este eje antes de escribir nada.
+  const { data: existing, error } = await db
+    .from("attribute_values")
+    .select("id")
+    .eq("group_id", groupId);
+  if (error) throw new Error(error.message);
+
+  const validIds = new Set((existing ?? []).map((v) => v.id));
+  if (
+    orderedIds.length !== validIds.size ||
+    orderedIds.some((id) => !validIds.has(id))
+  ) {
+    throw new Error("La lista de orden no coincide con las opciones de este eje.");
+  }
+
+  const results = await Promise.all(
+    orderedIds.map((id, i) =>
+      db
+        .from("attribute_values")
+        .update({ sort_order: i + 1 })
+        .eq("id", id),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw new Error(failed.error.message);
+
   revalidateAll();
 }

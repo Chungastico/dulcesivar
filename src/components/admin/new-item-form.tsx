@@ -90,6 +90,11 @@ export function NewItemForm({ categories }: { categories: string[] }) {
         </label>
       </div>
 
+      <label className="flex items-center gap-2 text-base text-ink">
+        <input type="checkbox" name="has_variants" className="size-4" />
+        Viene en colores u otras variantes
+      </label>
+
       <SubmitButton />
     </form>
   );

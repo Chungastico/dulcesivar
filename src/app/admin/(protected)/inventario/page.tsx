@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 
 import { NewItemForm } from "@/components/admin/new-item-form";
 import { PurchaseForm } from "@/components/admin/purchase-form";
+import { VariantToggle } from "@/components/admin/variant-toggle";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type {
@@ -133,11 +134,20 @@ export default async function InventarioPage() {
             <h2 className="text-base font-semibold text-brand-green">
               Costo por insumo
             </h2>
+            <p className="text-sm text-ink-muted">
+              Marca «Colores» en los insumos que vienen en variantes (tazas,
+              termos…). Solo esos ofrecen el selector de color al registrar una
+              compra; el precio de venta del regalo no cambia por color, sí
+              puede cambiar el costo de cada uno.
+            </p>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[34rem] text-left text-base">
+              <table className="w-full min-w-[36rem] text-left text-base">
                 <thead>
                   <tr className="border-b-2 border-line text-sm text-ink-muted">
                     <th className="py-2 pr-3 font-medium">Insumo</th>
+                    <th className="w-20 py-2 pr-3 text-center font-medium">
+                      Colores
+                    </th>
                     <th className="py-2 pr-3 text-right font-medium">Comprado</th>
                     <th className="py-2 pr-3 text-right font-medium">Invertido</th>
                     <th className="py-2 text-right font-medium">Costo unit.</th>
@@ -147,25 +157,28 @@ export default async function InventarioPage() {
                   <tbody key={category}>
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="bg-brand-cream/40 px-2 py-1.5 text-sm font-medium text-brand-green"
                       >
                         {category}
                       </td>
                     </tr>
-                    {list.map((item) => {
-                      const variants = variantStatusByItem.get(item.id) ?? [];
+                    {list.map((item, itemIdx) => {
+                      const variants = item.has_variants
+                        ? (variantStatusByItem.get(item.id) ?? [])
+                        : [];
                       return (
                         <Fragment key={item.id}>
                           <tr className="border-b border-line-soft">
                             <td className="py-2 pr-3 text-ink">
+                              {item.has_variants ? `${itemIdx + 1}. ` : null}
                               {item.label}
-                              {variants.length ? (
-                                <span className="ml-1.5 text-sm text-ink-muted">
-                                  ({variants.length} color
-                                  {variants.length === 1 ? "" : "es"})
-                                </span>
-                              ) : null}
+                            </td>
+                            <td className="py-2 pr-3 text-center">
+                              <VariantToggle
+                                itemId={item.id}
+                                checked={item.has_variants}
+                              />
                             </td>
                             <td className="py-2 pr-3 text-right text-ink-muted">
                               {Number(item.total_quantity) || "—"}
@@ -181,13 +194,15 @@ export default async function InventarioPage() {
                                 : "sin costo"}
                             </td>
                           </tr>
-                          {/* Desglose por color: no cambia el costo combinado
-                              de arriba, solo muestra cuánto hay de cada uno. */}
-                          {variants.map((v) => (
+                          {/* Lista numerada por color: no cambia el costo
+                              combinado de arriba, solo desglosa cuánto hay de
+                              cada uno. */}
+                          {variants.map((v, vIdx) => (
                             <tr key={v.id} className="border-b border-line-soft">
                               <td className="py-1.5 pr-3 pl-6 text-sm text-ink-muted">
-                                ↳ {v.variant_name}
+                                {vIdx + 1}. {v.variant_name}
                               </td>
+                              <td className="py-1.5 pr-3" />
                               <td className="py-1.5 pr-3 text-right text-sm text-ink-muted">
                                 {Number(v.total_quantity) || "—"}
                               </td>
@@ -203,6 +218,16 @@ export default async function InventarioPage() {
                               </td>
                             </tr>
                           ))}
+                          {item.has_variants && variants.length === 0 ? (
+                            <tr className="border-b border-line-soft">
+                              <td
+                                colSpan={5}
+                                className="py-1.5 pl-6 text-sm text-ink-muted"
+                              >
+                                Sin colores registrados todavía.
+                              </td>
+                            </tr>
+                          ) : null}
                         </Fragment>
                       );
                     })}

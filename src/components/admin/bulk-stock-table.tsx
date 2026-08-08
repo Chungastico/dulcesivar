@@ -254,9 +254,11 @@ export function BulkStockTable({
                 </td>
               </tr>
               {list.map((item) => {
-                const variants = variantsFor(item.id);
-
-                if (variants.length > 0) {
+                // has_variants es lo que decide, no si ya existe algún color
+                // cargado: así el "+ agregar color" deja de ofrecerse en los
+                // insumos que nunca lo van a necesitar (una jarra, un squeeze).
+                if (item.has_variants) {
+                  const variants = variantsFor(item.id);
                   return (
                     <Row
                       key={item.id}
@@ -277,6 +279,11 @@ export function BulkStockTable({
                         variantsEnabled ? (
                           <AddColor
                             itemId={item.id}
+                            label={
+                              variants.length === 0
+                                ? "+ Agregar el primer color"
+                                : undefined
+                            }
                             onCreated={(v) => handleVariantCreated(item.id, v)}
                           />
                         ) : null
@@ -301,15 +308,6 @@ export function BulkStockTable({
                     setQuantities={setQuantities}
                     setCosts={setCosts}
                     setUnitDrafts={setUnitDrafts}
-                    addColor={
-                      variantsEnabled ? (
-                        <AddColor
-                          itemId={item.id}
-                          label="+ Este insumo tiene colores"
-                          onCreated={(v) => handleVariantCreated(item.id, v)}
-                        />
-                      ) : null
-                    }
                   />
                 );
               })}

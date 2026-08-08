@@ -77,6 +77,11 @@ export type ContentPreset = {
   category: string;
   unit: string;
   sort_order: number;
+  /** Ella lo marca a mano: dice si este insumo viene en colores/variantes.
+   *  Sin esto, la única forma de saberlo era mirar si ya existían filas en
+   *  content_preset_variants, y el "+ agregar color" terminaba ofreciéndose
+   *  en insumos que nunca lo van a necesitar. */
+  has_variants: boolean;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -118,6 +123,7 @@ export type InventoryStatus = {
   label: string;
   category: string;
   unit: string;
+  has_variants: boolean;
   is_active: boolean;
   total_quantity: number;
   total_invested: number;

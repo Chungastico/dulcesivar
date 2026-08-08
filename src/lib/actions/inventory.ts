@@ -290,12 +290,18 @@ export async function createInventoryItem(
   const label = String(formData.get("label") ?? "").trim();
   const category = String(formData.get("category") ?? "Otros").trim() || "Otros";
   const unit = String(formData.get("unit") ?? "unidad").trim() || "unidad";
+  const hasVariants = formData.get("has_variants") === "on";
 
   if (label.length < 2) return { error: "Escribe el nombre del insumo." };
 
-  const { error } = await supabaseAdmin()
-    .from("content_presets")
-    .insert({ label, category, unit, sort_order: 999, is_active: true });
+  const { error } = await supabaseAdmin().from("content_presets").insert({
+    label,
+    category,
+    unit,
+    has_variants: hasVariants,
+    sort_order: 999,
+    is_active: true,
+  });
 
   if (error) {
     return {
@@ -308,4 +314,23 @@ export async function createInventoryItem(
 
   revalidatePath("/admin/inventario");
   return { ok: `Insumo «${label}» agregado.` };
+}
+
+/**
+ * Marca o desmarca si un insumo viene en colores/variantes. Es la casilla
+ * "Colores" de la tabla de costos: reemplaza tener que adivinarlo mirando si
+ * ya existen filas en content_preset_variants.
+ */
+export async function setHasVariants(itemId: string, hasVariants: boolean) {
+  await requireAdmin();
+
+  const { error } = await supabaseAdmin()
+    .from("content_presets")
+    .update({ has_variants: hasVariants })
+    .eq("id", itemId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/inventario/carga-inicial");
 }

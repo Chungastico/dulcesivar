@@ -34,11 +34,11 @@ export default async function NewProductPage() {
       <div>
         <Link
           href="/admin/catalogo"
-          className="text-sm text-neutral-500 hover:text-neutral-900"
+          className="text-sm text-ink-muted transition hover:text-brand-green"
         >
           ← Catálogo
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-neutral-900">
+        <h1 className="mt-2 text-2xl font-semibold text-ink">
           Nuevo producto
         </h1>
       </div>

@@ -54,21 +54,26 @@ export default async function EditProductPage({
   const publicUrlBase = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
 
   return (
-    <div className="flex max-w-6xl flex-col gap-5">
+    <div className="flex max-w-6xl flex-col gap-5 pb-10">
       <div>
         <Link
           href="/admin/catalogo"
-          className="text-sm text-neutral-500 hover:text-neutral-900"
+          className="text-sm text-ink-muted transition hover:text-brand-green"
         >
           ← Catálogo
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-neutral-900">
+        <h1 className="mt-2 text-2xl font-semibold text-ink">
           {product.name}
         </h1>
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-neutral-900">Imágenes</h2>
+      {/* Gestión de fotos ya guardadas (portada / borrar). Va en su propia
+          tarjeta, separada del asistente de pasos de abajo, para que no se
+          confunda con "elegir fotos nuevas" del paso 1. */}
+      <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
+        <h2 className="text-base font-semibold text-brand-green">
+          Imágenes guardadas
+        </h2>
         <ProductImages images={images} publicUrlBase={publicUrlBase} />
       </section>
 
@@ -91,12 +96,16 @@ export default async function EditProductPage({
         }}
       />
 
-      <section className="flex flex-col gap-2 border-t border-neutral-200 pt-6">
-        <h2 className="text-sm font-medium text-neutral-900">Eliminar</h2>
-        <p className="text-xs text-neutral-500">
+      <section className="flex flex-col gap-2 rounded-2xl border border-red-200 bg-red-50/60 p-5">
+        <h2 className="text-base font-semibold text-red-800">
+          Eliminar producto
+        </h2>
+        <p className="text-sm text-red-800/80">
           Borra el producto, su contenido y sus imágenes. No se puede deshacer.
         </p>
-        <DeleteProductButton productId={product.id} productName={product.name} />
+        <div className="mt-1">
+          <DeleteProductButton productId={product.id} productName={product.name} />
+        </div>
       </section>
     </div>
   );

@@ -51,6 +51,7 @@ export function PurchaseForm({
   }
 
   const today = new Date().toISOString().slice(0, 10);
+  const selectedItem = items.find((i) => i.id === itemId);
   const variants = variantsByItem.get(itemId) ?? [];
 
   return (
@@ -97,7 +98,7 @@ export function PurchaseForm({
         </select>
       </label>
 
-      {itemId && variantsEnabled ? (
+      {itemId && variantsEnabled && selectedItem?.has_variants ? (
         <VariantPicker itemId={itemId} variants={variants} />
       ) : null}
 
@@ -250,6 +251,11 @@ export function PurchaseForm({
 /**
  * Selector de color del insumo elegido, con alta rápida si falta uno.
  *
+ * Solo se muestra cuando el insumo ya está marcado como "Colores" en la tabla
+ * de costos (has_variants) — eso es lo que decide si un insumo tiene colores,
+ * no si ya existe algún color cargado. Por eso aquí no hace falta preguntar
+ * "¿tiene colores?": ya se sabe que sí, solo falta cuáles.
+ *
  * Vive fuera del <select> nativo del insumo para poder mostrarse u ocultarse
  * sin perder lo que ella ya escribió en cantidad/precio.
  */
@@ -278,7 +284,7 @@ function VariantPicker({
         onClick={() => setAdding(true)}
         className="self-start text-sm text-brand-green underline decoration-dotted transition hover:text-brand-teal"
       >
-        + Este insumo tiene colores u otras variantes
+        + Agregar el primer color de este insumo
       </button>
     );
   }

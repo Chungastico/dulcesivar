@@ -5,7 +5,12 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 type NavItem = {
-  href: "/admin" | "/admin/catalogo" | "/admin/categorias" | "/admin/inventario";
+  href:
+    | "/admin"
+    | "/admin/catalogo"
+    | "/admin/categorias"
+    | "/admin/inventario"
+    | "/admin/links";
   label: string;
   icon: React.ReactNode;
 };
@@ -15,6 +20,7 @@ const NAV: NavItem[] = [
   { href: "/admin/catalogo", label: "Catálogo", icon: <IconBox /> },
   { href: "/admin/categorias", label: "Categorías", icon: <IconTag /> },
   { href: "/admin/inventario", label: "Inventario", icon: <IconBoxes /> },
+  { href: "/admin/links", label: "Links", icon: <IconLink /> },
 ];
 
 export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
@@ -169,6 +175,16 @@ function IconBoxes() {
       <path d="M3 8.5 12 4l9 4.5-9 4.5-9-4.5Z" />
       <path d="m3 13 9 4.5 9-4.5" />
       <path d="m3 17 9 4.5 9-4.5" />
+    </svg>
+  );
+}
+
+function IconLink() {
+  return (
+    <svg {...iconProps}>
+      <path d="M9 17H7A5 5 0 0 1 7 7h2" />
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2" />
+      <path d="M8 12h8" />
     </svg>
   );
 }
