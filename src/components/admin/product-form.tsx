@@ -87,13 +87,8 @@ export function ProductForm({
   const [analyzing, setAnalyzing] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [tagError, setTagError] = useState<string | null>(null);
-  // Sin esto, volver al paso 1 y reelegir la misma foto relanzaría el análisis
-  // y pisaría lo que ella ya hubiera corregido.
   const analyzedFor = useRef<File | null>(null);
 
-  // Las object URLs viven aquí y no en el selector, porque el panel lateral
-  // también las usa. Se liberan al cambiar de selección o al desmontar; si no,
-  // cada cambio de fotos dejaría memoria colgada.
   useEffect(() => {
     return () => previews.forEach((url) => URL.revokeObjectURL(url));
   }, [previews]);

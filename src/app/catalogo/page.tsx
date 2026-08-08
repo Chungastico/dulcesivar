@@ -16,7 +16,7 @@ import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 export const metadata: Metadata = {
   title: "Catálogo",
   description:
-    "Explora los regalos de Dulces Sivar por ocasión, tipo de caja, contenido y presupuesto.",
+    "Explora los regalos de Dulce Sivar por ocasión, tipo de caja, contenido y presupuesto.",
 };
 
 export default async function CatalogoPage({

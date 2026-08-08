@@ -2,13 +2,6 @@
 
 import { useRef, useState } from "react";
 
-/**
- * Zona de carga de fotos.
- *
- * Solo elige archivos: la vista previa vive en PhotoRail, que queda fija a la
- * derecha durante todos los pasos. Duplicar las miniaturas aquí solo repetiría
- * lo que ya se ve al lado.
- */
 export function ImagePicker({
   onFilesChange,
   selectedCount,

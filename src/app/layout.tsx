@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Dulces Sivar — Regalos y detalles dulces",
-    template: "%s | Dulces Sivar",
+    default: "Dulce Sivar — Regalos y detalles dulces",
+    template: "%s | Dulce Sivar",
   },
   description:
     "Catálogo de regalos y detalles dulces para bodas, aniversarios, San Valentín y toda ocasión especial.",

@@ -9,9 +9,10 @@ import type { ContentPresetVariant, InventoryStatus } from "@/lib/supabase/types
 /**
  * Registro de una compra de insumo.
  *
- * Pide cantidad y precio total —no el unitario— porque es como viene la
- * factura. El unitario se muestra en vivo mientras escribe, para que note al
- * instante si tecleó un cero de más antes de guardar.
+ * El precio se puede escribir como total pagado (como viene la factura) o
+ * como costo por unidad (como se sabe de memoria un precio de lista): el que
+ * se escriba último manda, y el otro se recalcula solo. Los dos guardan lo
+ * mismo: total_cost, que es lo que exige la base.
  *
  * Si el insumo elegido tiene colores (una taza, un termo…), aparece un
  * segundo selector para decir cuál. Los insumos sin colores no lo ven nunca:
@@ -20,19 +21,34 @@ import type { ContentPresetVariant, InventoryStatus } from "@/lib/supabase/types
 export function PurchaseForm({
   items,
   variantsByItem,
+  variantsEnabled = true,
 }: {
   items: InventoryStatus[];
   variantsByItem: Map<string, ContentPresetVariant[]>;
+  /** false si la migración 006 no se ha corrido: oculta el selector de color
+   *  en vez de dejar un botón que fallaría al usarlo. */
+  variantsEnabled?: boolean;
 }) {
   const [state, action] = useActionState(registerPurchase, {});
   const [quantity, setQuantity] = useState("");
   const [total, setTotal] = useState("");
+  const [unitDraft, setUnitDraft] = useState("");
   const [itemId, setItemId] = useState("");
   const [formKey, setFormKey] = useState(0);
 
   const q = Number(quantity);
   const t = Number(total);
   const unit = q > 0 && total !== "" && !Number.isNaN(t) ? t / q : null;
+
+  // Escribir en "costo por unidad" recalcula el total; requiere la cantidad
+  // primero, porque sin ella no hay con qué multiplicar.
+  function handleUnitChange(value: string) {
+    setUnitDraft(value);
+    const u = Number(value);
+    if (q > 0 && value !== "" && !Number.isNaN(u)) {
+      setTotal((u * q).toFixed(2));
+    }
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const variants = variantsByItem.get(itemId) ?? [];
@@ -81,26 +97,35 @@ export function PurchaseForm({
         </select>
       </label>
 
-      {itemId ? (
+      {itemId && variantsEnabled ? (
         <VariantPicker itemId={itemId} variants={variants} />
       ) : null}
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2">
-          <span className="text-base font-medium text-ink">Cantidad</span>
-          <input
-            name="quantity"
-            type="number"
-            step="0.001"
-            min="0.001"
-            required
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="24"
-            className={inputClass}
-          />
-        </label>
+      <label className="flex flex-col gap-2">
+        <span className="text-base font-medium text-ink">Cantidad</span>
+        <input
+          name="quantity"
+          type="number"
+          step="0.001"
+          min="0.001"
+          required
+          value={quantity}
+          onChange={(e) => {
+            setQuantity(e.target.value);
+            // Cambiar la cantidad con un costo unitario ya escrito debe
+            // recalcular el total; si se dejó el total a mano, ese se respeta.
+            const newQ = Number(e.target.value);
+            const u = Number(unitDraft);
+            if (unitDraft !== "" && newQ > 0 && !Number.isNaN(u)) {
+              setTotal((u * newQ).toFixed(2));
+            }
+          }}
+          placeholder="24"
+          className={inputClass}
+        />
+      </label>
 
+      <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
           <span className="text-base font-medium text-ink">
             Precio total pagado
@@ -114,9 +139,33 @@ export function PurchaseForm({
               min="0"
               required
               value={total}
-              onChange={(e) => setTotal(e.target.value)}
+              onChange={(e) => {
+                setTotal(e.target.value);
+                setUnitDraft(""); // el total escrito a mano manda sobre el unitario
+              }}
               placeholder="18.00"
               className={inputClass}
+            />
+          </div>
+        </label>
+
+        <label className="flex flex-col gap-2">
+          <span className="text-base font-medium text-ink">
+            …o costo por unidad{" "}
+            <span className="text-ink-muted">(calcula el total)</span>
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold text-ink-muted">$</span>
+            <input
+              type="number"
+              step="0.0001"
+              min="0"
+              value={unitDraft}
+              onChange={(e) => handleUnitChange(e.target.value)}
+              disabled={!(q > 0)}
+              title={q > 0 ? undefined : "Escribe la cantidad primero"}
+              placeholder={q > 0 ? "0.75" : "Escribe la cantidad primero"}
+              className={`${inputClass} disabled:cursor-not-allowed disabled:opacity-50`}
             />
           </div>
         </label>

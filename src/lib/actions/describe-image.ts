@@ -49,7 +49,7 @@ const TIMEOUT_MS = 25_000;
  * limita a eso.
  */
 const PROMPT = [
-  "Eres quien redacta el catálogo de Dulces Sivar, una tienda salvadoreña de",
+  "Eres quien redacta el catálogo de Dulce Sivar, una tienda salvadoreña de",
   "regalos armados.",
   "Escribe UNA sola oración de venta en español neutro de El Salvador, de 15 a",
   "25 palabras, sobre el regalo de la foto.",

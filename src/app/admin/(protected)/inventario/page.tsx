@@ -98,6 +98,15 @@ export default async function InventarioPage() {
         </div>
       </div>
 
+      {variantsResult.error || variantStatusResult.error ? (
+        <p className="rounded-xl border-2 border-brand-orange bg-brand-orange/10 px-4 py-3 text-base text-ink">
+          Los colores de insumo no están disponibles todavía:{" "}
+          {(variantsResult.error ?? variantStatusResult.error)!.message}. ¿Ya
+          ejecutaste <code>supabase/migrations/006_variantes.sql</code> en
+          Supabase?
+        </p>
+      ) : null}
+
       <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat label="Insumos" value={String(items.length)} accent="bg-brand-green" />
         <Stat label="Con costo registrado" value={`${conCosto} de ${items.length}`} accent="bg-brand-teal" />
@@ -111,7 +120,11 @@ export default async function InventarioPage() {
 
       <div className="grid items-start gap-5 lg:grid-cols-[24rem_1fr]">
         <div className="flex flex-col gap-5">
-          <PurchaseForm items={items} variantsByItem={variantsByItem} />
+          <PurchaseForm
+            items={items}
+            variantsByItem={variantsByItem}
+            variantsEnabled={!variantsResult.error}
+          />
           <NewItemForm categories={[...categories].sort()} />
         </div>
 

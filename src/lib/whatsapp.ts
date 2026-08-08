@@ -9,7 +9,7 @@ const PHONE = process.env.NEXT_PUBLIC_WHATSAPP ?? "50376815829";
 
 export function whatsappLink(productName: string, productUrl?: string): string {
   // Redactado como si lo escribiera la clienta que compra, no como aviso del
-  // sitio: así el mensaje que le llega a Dulces Sivar suena a pedido real.
+  // sitio: así el mensaje que le llega a Dulce Sivar suena a pedido real.
   const message = [
     `Hola, este es el arreglo que deseo: «${productName}».`,
     productUrl ? `\n${productUrl}` : "",

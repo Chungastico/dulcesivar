@@ -42,7 +42,7 @@ export default async function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold text-brand-green">Panel</h1>
         <p className="mt-1 text-sm text-ink-muted">
-          Resumen del catálogo de Dulces Sivar.
+          Resumen del catálogo de Dulce Sivar.
         </p>
       </div>
 

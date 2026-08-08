@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { PoliciesNote } from "@/components/catalog/policies-note";
 import { ProductCard } from "@/components/catalog/product-card";
 import type { CatalogProduct } from "@/lib/catalog-filters";
 import { publicEnv } from "@/lib/env";
@@ -227,6 +228,8 @@ export default async function ProductoPage({
             </svg>
             Consultar por WhatsApp
           </a>
+
+          <PoliciesNote />
 
           {tags.length ? (
             <ul className="flex flex-wrap gap-2">

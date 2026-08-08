@@ -32,7 +32,7 @@ export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
         >
           <IconMenu />
         </button>
-        <span className="font-semibold">Dulces Sivar</span>
+        <span className="font-semibold">Dulce Sivar</span>
       </div>
 
       {open ? (
@@ -45,14 +45,13 @@ export function Sidebar({ userSlot }: { userSlot: React.ReactNode }) {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brand-green transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col bg-brand-green transition-transform lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"
+          }`}
       >
         <div className="flex items-center justify-between px-5 py-5">
           <Link href="/admin" className="flex flex-col" onClick={() => setOpen(false)}>
             <span className="text-lg font-semibold text-white">
-              Dulces Sivar
+              Dulce Sivar
             </span>
             <span className="text-xs text-brand-lime">Panel de administración</span>
           </Link>
@@ -107,11 +106,10 @@ function NavLink({
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${
-        active
+      className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition ${active
           ? "bg-white/15 font-medium text-white"
           : "text-white/70 hover:bg-white/10 hover:text-white"
-      }`}
+        }`}
     >
       {/* Barra lima a la izquierda: el estado activo no depende solo del
           cambio de fondo, que es sutil sobre verde oscuro. */}

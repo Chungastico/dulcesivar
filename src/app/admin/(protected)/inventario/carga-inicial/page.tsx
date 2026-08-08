@@ -60,7 +60,20 @@ export default async function CargaInicialPage() {
           {statusResult.error.message}
         </p>
       ) : (
-        <BulkStockTable items={items} variantsByItem={variantsByItem} />
+        <>
+          {variantResult.error ? (
+            <p className="rounded-xl border-2 border-brand-orange bg-brand-orange/10 px-4 py-3 text-base text-ink">
+              Los colores no están disponibles todavía: {variantResult.error.message}.
+              ¿Ya ejecutaste <code>supabase/migrations/006_variantes.sql</code> en
+              Supabase? Mientras tanto puedes seguir cargando el stock normal.
+            </p>
+          ) : null}
+          <BulkStockTable
+            items={items}
+            variantsByItem={variantsByItem}
+            variantsEnabled={!variantResult.error}
+          />
+        </>
       )}
     </div>
   );

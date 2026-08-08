@@ -4,10 +4,6 @@ import { useState, useTransition } from "react";
 
 import { deleteProduct } from "@/lib/actions/products";
 
-/**
- * Borrado en dos pasos. El primer clic solo pide confirmación: es una acción
- * irreversible que además borra los archivos del bucket.
- */
 export function DeleteProductButton({
   productId,
   productName,

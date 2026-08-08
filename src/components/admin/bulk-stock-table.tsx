@@ -1,9 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 
-import { bulkRegisterInventory, type BulkRow } from "@/lib/actions/inventory";
+import {
+  bulkRegisterInventory,
+  createVariant,
+  type BulkRow,
+} from "@/lib/actions/inventory";
 import type { InventoryStatus } from "@/lib/supabase/types";
 
 const TYPE_LABELS = {
@@ -39,19 +43,28 @@ function rowKey(itemId: string, variantId: string | null) {
  *
  * Un insumo con colores (una taza, un termo…) se expande en una fila por
  * color en vez de una sola: el stock se guarda por color, que es como ella
- * realmente lo tiene separado.
+ * realmente lo tiene separado. El color se puede dar de alta aquí mismo, sin
+ * salir a otra pantalla.
  */
 export function BulkStockTable({
   items,
   variantsByItem,
+  variantsEnabled = true,
 }: {
   items: InventoryStatus[];
   variantsByItem: Map<string, BulkVariant[]>;
+  /** false si la migración 006 no se ha corrido: oculta "+ agregar color". */
+  variantsEnabled?: boolean;
 }) {
   const router = useRouter();
 
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [costs, setCosts] = useState<Record<string, string>>({});
+  // Texto tal cual se escribió en "costo por unidad", por fila. Separado del
+  // valor derivado (costo total / cantidad): si el campo mostrara el
+  // derivado y a la vez se pudiera editar, el cursor saltaría y el número se
+  // reformatearía a cada tecla mientras escribe.
+  const [unitDrafts, setUnitDrafts] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
   const [purchaseType, setPurchaseType] =
     useState<keyof typeof TYPE_LABELS>("inicial");
@@ -65,11 +78,21 @@ export function BulkStockTable({
     null,
   );
 
+  // Colores creados desde esta tabla en lo que va de la sesión, antes de que
+  // la página recargue los datos del servidor con la lista actualizada.
+  const [localVariants, setLocalVariants] = useState<Record<string, BulkVariant[]>>(
+    {},
+  );
+  const variantsFor = (itemId: string) => [
+    ...(variantsByItem.get(itemId) ?? []),
+    ...(localVariants[itemId] ?? []),
+  ];
+
   const byCategory = useMemo(() => {
     const q = normalize(query.trim());
     const map = new Map<string, InventoryStatus[]>();
     for (const item of items) {
-      const variants = variantsByItem.get(item.id) ?? [];
+      const variants = variantsFor(item.id);
       const matchesItem = !q || normalize(item.label).includes(q);
       const matchesVariant = variants.some((v) => normalize(v.name).includes(q));
       if (q && !matchesItem && !matchesVariant) continue;
@@ -78,7 +101,8 @@ export function BulkStockTable({
       map.set(item.category, list);
     }
     return [...map.entries()];
-  }, [items, query, variantsByItem]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, query, variantsByItem, localVariants]);
 
   const filledCount = Object.keys(quantities).filter(
     (key) => quantities[key]?.trim() && costs[key]?.trim(),
@@ -119,6 +143,13 @@ export function BulkStockTable({
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleVariantCreated(itemId: string, variant: BulkVariant) {
+    setLocalVariants((prev) => ({
+      ...prev,
+      [itemId]: [...(prev[itemId] ?? []), variant],
+    }));
   }
 
   return (
@@ -208,8 +239,8 @@ export function BulkStockTable({
                 Ya registrado
               </th>
               <th className="w-28 py-2 pr-3 font-medium">Cantidad</th>
-              <th className="w-36 py-2 pr-3 font-medium">Costo total</th>
-              <th className="w-24 py-2 pr-4 text-right font-medium">Unit.</th>
+              <th className="w-32 py-2 pr-3 font-medium">Costo total</th>
+              <th className="w-32 py-2 pr-4 font-medium">Costo unit.</th>
             </tr>
           </thead>
           {byCategory.map(([category, list]) => (
@@ -223,10 +254,8 @@ export function BulkStockTable({
                 </td>
               </tr>
               {list.map((item) => {
-                const variants = variantsByItem.get(item.id) ?? [];
+                const variants = variantsFor(item.id);
 
-                // Insumo con colores: una fila por color, no una fila del
-                // insumo entero — el stock se guarda separado por color.
                 if (variants.length > 0) {
                   return (
                     <Row
@@ -240,8 +269,18 @@ export function BulkStockTable({
                       }))}
                       quantities={quantities}
                       costs={costs}
+                      unitDrafts={unitDrafts}
                       setQuantities={setQuantities}
                       setCosts={setCosts}
+                      setUnitDrafts={setUnitDrafts}
+                      addColor={
+                        variantsEnabled ? (
+                          <AddColor
+                            itemId={item.id}
+                            onCreated={(v) => handleVariantCreated(item.id, v)}
+                          />
+                        ) : null
+                      }
                     />
                   );
                 }
@@ -258,8 +297,19 @@ export function BulkStockTable({
                     ]}
                     quantities={quantities}
                     costs={costs}
+                    unitDrafts={unitDrafts}
                     setQuantities={setQuantities}
                     setCosts={setCosts}
+                    setUnitDrafts={setUnitDrafts}
+                    addColor={
+                      variantsEnabled ? (
+                        <AddColor
+                          itemId={item.id}
+                          label="+ Este insumo tiene colores"
+                          onCreated={(v) => handleVariantCreated(item.id, v)}
+                        />
+                      ) : null
+                    }
                   />
                 );
               })}
@@ -283,16 +333,22 @@ function Row({
   rows,
   quantities,
   costs,
+  unitDrafts,
   setQuantities,
   setCosts,
+  setUnitDrafts,
+  addColor,
 }: {
   groupLabel?: string;
   sub?: boolean;
   rows: { key: string; label: string; existing: number }[];
   quantities: Record<string, string>;
   costs: Record<string, string>;
+  unitDrafts: Record<string, string>;
   setQuantities: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   setCosts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setUnitDrafts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  addColor?: React.ReactNode;
 }) {
   return (
     <>
@@ -303,18 +359,25 @@ function Row({
           </td>
         </tr>
       ) : null}
-      {rows.map((row) => {
+      {rows.map((row, i) => {
         const qty = quantities[row.key] ?? "";
         const cost = costs[row.key] ?? "";
         const q = Number(qty);
         const c = Number(cost);
-        const unit = qty && cost && q > 0 ? c / q : null;
+        const derivedUnit = qty && cost && q > 0 ? c / q : null;
+        // Mientras escribe en "costo por unidad" se muestra tal cual lo tecleó,
+        // no el valor recalculado: si mostrara el derivado, el número se
+        // reformatearía a cada tecla y el cursor saltaría.
+        const unitDisplay =
+          unitDrafts[row.key] ?? (derivedUnit != null ? derivedUnit.toFixed(4) : "");
+        const isLast = i === rows.length - 1;
 
         return (
           <tr key={row.key} className="border-b border-line-soft">
             <td className={`py-1.5 pr-3 text-ink ${sub ? "pl-8 text-sm" : "pl-4"}`}>
               {sub ? "↳ " : ""}
               {row.label}
+              {isLast && addColor ? <span className="ml-2">{addColor}</span> : null}
             </td>
             <td className="py-1.5 pr-3 text-right text-sm text-ink-muted">
               {row.existing > 0 ? row.existing : "—"}
@@ -326,9 +389,18 @@ function Row({
                 step="0.001"
                 inputMode="decimal"
                 value={qty}
-                onChange={(e) =>
-                  setQuantities((prev) => ({ ...prev, [row.key]: e.target.value }))
-                }
+                onChange={(e) => {
+                  const newQty = e.target.value;
+                  setQuantities((prev) => ({ ...prev, [row.key]: newQty }));
+                  // Si ya había un costo unitario escrito, cambiar la cantidad
+                  // debe recalcular el total con ese unitario, no dejarlo fijo.
+                  const draft = unitDrafts[row.key];
+                  const u = Number(draft);
+                  const nq = Number(newQty);
+                  if (draft && nq > 0 && !Number.isNaN(u)) {
+                    setCosts((prev) => ({ ...prev, [row.key]: (u * nq).toFixed(2) }));
+                  }
+                }}
                 aria-label={`Cantidad de ${row.label}`}
                 className={cellInput}
               />
@@ -342,21 +414,117 @@ function Row({
                   step="0.01"
                   inputMode="decimal"
                   value={cost}
-                  onChange={(e) =>
-                    setCosts((prev) => ({ ...prev, [row.key]: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setCosts((prev) => ({ ...prev, [row.key]: e.target.value }));
+                    // El total escrito a mano manda sobre cualquier unitario
+                    // que hubiera quedado de antes.
+                    setUnitDrafts((prev) => ({ ...prev, [row.key]: "" }));
+                  }}
                   aria-label={`Costo total de ${row.label}`}
                   className={cellInput}
                 />
               </div>
             </td>
-            <td className="py-1.5 pr-4 text-right text-sm text-ink-muted">
-              {unit != null ? `$${unit.toFixed(3)}` : "—"}
+            <td className="py-1.5 pr-4">
+              <div className="flex items-center gap-1">
+                <span className="text-ink-muted">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.0001"
+                  inputMode="decimal"
+                  disabled={!(q > 0)}
+                  value={unitDisplay}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setUnitDrafts((prev) => ({ ...prev, [row.key]: value }));
+                    const u = Number(value);
+                    if (q > 0 && value !== "" && !Number.isNaN(u)) {
+                      setCosts((prev) => ({ ...prev, [row.key]: (u * q).toFixed(2) }));
+                    }
+                  }}
+                  title={q > 0 ? undefined : "Escribe la cantidad primero"}
+                  aria-label={`Costo por unidad de ${row.label}`}
+                  className={`${cellInput} disabled:cursor-not-allowed disabled:opacity-50`}
+                />
+              </div>
             </td>
           </tr>
         );
       })}
     </>
+  );
+}
+
+/**
+ * Alta de color en línea: sin esto, para agregar "Taza — Rojo" habría que
+ * salir a "Registrar compra", crearlo ahí, y volver. La nueva fila aparece de
+ * inmediato con los campos vacíos listos para llenar.
+ */
+function AddColor({
+  itemId,
+  label = "+ Agregar color",
+  onCreated,
+}: {
+  itemId: string;
+  label?: string;
+  onCreated: (variant: BulkVariant) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm text-brand-green underline decoration-dotted transition hover:text-brand-teal"
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
+        placeholder="Negro, blanco…"
+        className="w-32 rounded border-2 border-line bg-surface px-1.5 py-0.5 text-sm text-ink focus:border-brand-teal focus:outline-none"
+      />
+      <button
+        type="button"
+        disabled={pending || !name.trim()}
+        onClick={() =>
+          startTransition(async () => {
+            setError(null);
+            const res = await createVariant(itemId, name);
+            if (res.error) setError(res.error);
+            else if (res.id) {
+              onCreated({ id: res.id, name: name.trim(), totalQuantity: 0 });
+              setName("");
+              setOpen(false);
+            }
+          })
+        }
+        className="rounded bg-brand-green px-2 py-0.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? "…" : "OK"}
+      </button>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        className="text-sm text-ink-muted hover:underline"
+      >
+        ✕
+      </button>
+      {error ? <span className="text-sm text-red-700">{error}</span> : null}
+    </span>
   );
 }
 
