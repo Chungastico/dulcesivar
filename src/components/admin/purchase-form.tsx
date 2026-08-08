@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
-import { registerPurchase } from "@/lib/actions/inventory";
-import type { InventoryStatus } from "@/lib/supabase/types";
+import { createVariant, registerPurchase } from "@/lib/actions/inventory";
+import type { ContentPresetVariant, InventoryStatus } from "@/lib/supabase/types";
 
 /**
  * Registro de una compra de insumo.
@@ -12,11 +12,22 @@ import type { InventoryStatus } from "@/lib/supabase/types";
  * Pide cantidad y precio total —no el unitario— porque es como viene la
  * factura. El unitario se muestra en vivo mientras escribe, para que note al
  * instante si tecleó un cero de más antes de guardar.
+ *
+ * Si el insumo elegido tiene colores (una taza, un termo…), aparece un
+ * segundo selector para decir cuál. Los insumos sin colores no lo ven nunca:
+ * la mayoría de lo que compra (chocolates, cajas) no los tiene.
  */
-export function PurchaseForm({ items }: { items: InventoryStatus[] }) {
+export function PurchaseForm({
+  items,
+  variantsByItem,
+}: {
+  items: InventoryStatus[];
+  variantsByItem: Map<string, ContentPresetVariant[]>;
+}) {
   const [state, action] = useActionState(registerPurchase, {});
   const [quantity, setQuantity] = useState("");
   const [total, setTotal] = useState("");
+  const [itemId, setItemId] = useState("");
   const [formKey, setFormKey] = useState(0);
 
   const q = Number(quantity);
@@ -24,6 +35,7 @@ export function PurchaseForm({ items }: { items: InventoryStatus[] }) {
   const unit = q > 0 && total !== "" && !Number.isNaN(t) ? t / q : null;
 
   const today = new Date().toISOString().slice(0, 10);
+  const variants = variantsByItem.get(itemId) ?? [];
 
   return (
     <form
@@ -53,7 +65,13 @@ export function PurchaseForm({ items }: { items: InventoryStatus[] }) {
 
       <label className="flex flex-col gap-2">
         <span className="text-base font-medium text-ink">Insumo</span>
-        <select name="item_id" required className={inputClass}>
+        <select
+          name="item_id"
+          required
+          value={itemId}
+          onChange={(e) => setItemId(e.target.value)}
+          className={inputClass}
+        >
           <option value="">Elige un insumo…</option>
           {items.map((item) => (
             <option key={item.id} value={item.id}>
@@ -62,6 +80,10 @@ export function PurchaseForm({ items }: { items: InventoryStatus[] }) {
           ))}
         </select>
       </label>
+
+      {itemId ? (
+        <VariantPicker itemId={itemId} variants={variants} />
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2">
@@ -173,6 +195,122 @@ export function PurchaseForm({ items }: { items: InventoryStatus[] }) {
 
       <SubmitButton />
     </form>
+  );
+}
+
+/**
+ * Selector de color del insumo elegido, con alta rápida si falta uno.
+ *
+ * Vive fuera del <select> nativo del insumo para poder mostrarse u ocultarse
+ * sin perder lo que ella ya escribió en cantidad/precio.
+ */
+function VariantPicker({
+  itemId,
+  variants,
+}: {
+  itemId: string;
+  variants: ContentPresetVariant[];
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  // Colores creados en esta sesión, antes de que la página vuelva a cargar
+  // los datos del servidor con la lista actualizada.
+  const [justAdded, setJustAdded] = useState<ContentPresetVariant[]>([]);
+
+  const all = [...variants, ...justAdded];
+  const hasAny = all.length > 0;
+
+  if (!hasAny && !adding) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAdding(true)}
+        className="self-start text-sm text-brand-green underline decoration-dotted transition hover:text-brand-teal"
+      >
+        + Este insumo tiene colores u otras variantes
+      </button>
+    );
+  }
+
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-base font-medium text-ink">
+        Color / variante <span className="text-ink-muted">(opcional)</span>
+      </span>
+
+      {hasAny ? (
+        <select name="variant_id" defaultValue="" className={inputClass}>
+          <option value="">Sin color específico</option>
+          {all
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+        </select>
+      ) : null}
+
+      {adding ? (
+        <div className="flex items-center gap-2">
+          <input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Negro, blanco, rojo…"
+            className={inputClass}
+          />
+          <button
+            type="button"
+            disabled={pending || !newName.trim()}
+            onClick={() =>
+              startTransition(async () => {
+                setError(null);
+                const res = await createVariant(itemId, newName);
+                if (res.error) setError(res.error);
+                else if (res.id) {
+                  setJustAdded((prev) => [
+                    ...prev,
+                    {
+                      id: res.id!,
+                      preset_id: itemId,
+                      name: newName.trim(),
+                      sort_order: 999,
+                      is_active: true,
+                      created_at: "",
+                      updated_at: "",
+                    },
+                  ]);
+                  setNewName("");
+                  setAdding(false);
+                }
+              })
+            }
+            className="shrink-0 rounded-lg bg-brand-green px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+          >
+            {pending ? "…" : "Agregar"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setAdding(false)}
+            className="shrink-0 text-sm text-ink-muted hover:underline"
+          >
+            Cancelar
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="self-start text-sm text-brand-green underline decoration-dotted transition hover:text-brand-teal"
+        >
+          + Agregar otro color
+        </button>
+      )}
+
+      {error ? <span className="text-sm text-red-700">{error}</span> : null}
+    </label>
   );
 }
 

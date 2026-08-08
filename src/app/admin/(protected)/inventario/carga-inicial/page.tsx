@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { BulkStockTable } from "@/components/admin/bulk-stock-table";
+import { BulkStockTable, type BulkVariant } from "@/components/admin/bulk-stock-table";
 import { requireAdmin } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { InventoryStatus } from "@/lib/supabase/types";
+import type { InventoryStatus, InventoryVariantStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
   title: "Carga inicial de inventario",
@@ -13,14 +13,27 @@ export const metadata: Metadata = {
 
 export default async function CargaInicialPage() {
   await requireAdmin();
+  const db = supabaseAdmin();
 
-  const { data, error } = await supabaseAdmin()
-    .from("inventory_status")
-    .select("*")
-    .order("category")
-    .order("label");
+  const [statusResult, variantResult] = await Promise.all([
+    db.from("inventory_status").select("*").order("category").order("label"),
+    db.from("inventory_variant_status").select("*").order("sort_order"),
+  ]);
 
-  const items = (data ?? []) as InventoryStatus[];
+  const items = (statusResult.data ?? []) as InventoryStatus[];
+  const variantStatus = (variantResult.data ?? []) as InventoryVariantStatus[];
+
+  const variantsByItem = new Map<string, BulkVariant[]>();
+  for (const v of variantStatus) {
+    if (!v.is_active) continue;
+    const list = variantsByItem.get(v.preset_id) ?? [];
+    list.push({
+      id: v.id,
+      name: v.variant_name,
+      totalQuantity: Number(v.total_quantity) || 0,
+    });
+    variantsByItem.set(v.preset_id, list);
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -36,17 +49,18 @@ export default async function CargaInicialPage() {
         </h1>
         <p className="mt-1 max-w-2xl text-base text-ink-muted">
           Escribe cantidad y costo total en la fila de cada insumo que tengas y
-          guarda todos de una vez, en vez de registrar uno por uno. Deja en
-          blanco los que no apliquen.
+          guarda todos de una vez, en vez de registrar uno por uno. Los
+          insumos con colores (tazas, termos…) aparecen con una fila por
+          color. Deja en blanco los que no apliquen.
         </p>
       </div>
 
-      {error ? (
+      {statusResult.error ? (
         <p className="rounded-xl border-2 border-brand-orange bg-brand-orange/10 px-4 py-3 text-base text-ink">
-          {error.message}
+          {statusResult.error.message}
         </p>
       ) : (
-        <BulkStockTable items={items} />
+        <BulkStockTable items={items} variantsByItem={variantsByItem} />
       )}
     </div>
   );

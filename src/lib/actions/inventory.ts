@@ -15,6 +15,9 @@ export type ActionState = { error?: string; ok?: string };
  */
 const purchaseSchema = z.object({
   item_id: z.string().uuid("Elige un insumo de la lista"),
+  // "" (sin variante) se normaliza a null antes de llegar aquí, para que la
+  // validación uuid no reviente con un insumo que no tiene colores.
+  variant_id: z.string().uuid().nullable(),
   quantity: z.coerce
     .number({ message: "La cantidad es obligatoria" })
     .positive("La cantidad debe ser mayor que cero")
@@ -35,8 +38,11 @@ export async function registerPurchase(
 ): Promise<ActionState> {
   await requireAdmin();
 
+  const rawVariant = String(formData.get("variant_id") ?? "").trim();
+
   const parsed = purchaseSchema.safeParse({
     item_id: formData.get("item_id"),
+    variant_id: rawVariant || null,
     quantity: formData.get("quantity"),
     total_cost: formData.get("total_cost"),
     purchase_type: formData.get("purchase_type"),
@@ -53,6 +59,7 @@ export async function registerPurchase(
     .from("inventory_purchases")
     .insert({
       item_id: parsed.data.item_id,
+      variant_id: parsed.data.variant_id,
       quantity: parsed.data.quantity,
       total_cost: parsed.data.total_cost,
       purchase_type: parsed.data.purchase_type,
@@ -61,13 +68,69 @@ export async function registerPurchase(
       notes: parsed.data.notes ?? null,
     });
 
-  if (error) return { error: error.message };
+  if (error) {
+    // El trigger de la base lanza este mensaje si el color elegido no
+    // pertenece al insumo (no debería poder pasar por la UI, pero si pasa,
+    // que se entienda por qué falló en vez de mostrar el error crudo de Postgres).
+    return {
+      error: error.message.includes("no pertenece a este insumo")
+        ? "Ese color no pertenece al insumo elegido."
+        : error.message,
+    };
+  }
 
   revalidatePath("/admin/inventario");
   revalidatePath("/admin/catalogo");
 
   const unit = parsed.data.total_cost / parsed.data.quantity;
   return { ok: `Compra registrada. Costo unitario: $${unit.toFixed(2)}` };
+}
+
+/**
+ * Crea un color/variante nuevo para un insumo, desde el propio formulario de
+ * compra: si aparece un color que no está en la lista, no hay que ir a otra
+ * pantalla a darlo de alta.
+ */
+export async function createVariant(
+  presetId: string,
+  name: string,
+): Promise<ActionState & { id?: string }> {
+  await requireAdmin();
+
+  const trimmed = name.trim();
+  if (trimmed.length < 1) return { error: "Escribe el nombre del color." };
+
+  const db = supabaseAdmin();
+  const { data: last } = await db
+    .from("content_preset_variants")
+    .select("sort_order")
+    .eq("preset_id", presetId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const { data, error } = await db
+    .from("content_preset_variants")
+    .insert({
+      preset_id: presetId,
+      name: trimmed,
+      sort_order: (last?.sort_order ?? 0) + 1,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "Ese insumo ya tiene un color con ese nombre."
+          : error.message,
+    };
+  }
+
+  revalidatePath("/admin/inventario");
+  return { ok: `Color «${trimmed}» agregado.`, id: data.id };
 }
 
 // ---------------------------------------------------------------------------
@@ -90,6 +153,7 @@ export async function registerPurchase(
 
 const bulkRowSchema = z.object({
   itemId: z.string().uuid(),
+  variantId: z.string().uuid().nullable(),
   quantity: z.coerce.number().positive().max(1_000_000),
   totalCost: z.coerce.number().min(0).max(1_000_000),
 });
@@ -101,7 +165,13 @@ const bulkMetaSchema = z.object({
   notes: z.string().trim().max(500).optional(),
 });
 
-export type BulkRow = { itemId: string; quantity: string; totalCost: string };
+export type BulkRow = {
+  itemId: string;
+  /** null = fila del insumo base; un id = fila de un color específico. */
+  variantId: string | null;
+  quantity: string;
+  totalCost: string;
+};
 export type BulkMeta = {
   purchasedAt: string;
   purchaseType?: "inicial" | "mayoreo" | "individual";
@@ -149,6 +219,7 @@ export async function bulkRegisterInventory(
 
   const payload = good.map((row) => ({
     item_id: row.itemId,
+    variant_id: row.variantId,
     quantity: row.quantity,
     total_cost: row.totalCost,
     purchase_type: parsedMeta.data.purchaseType,

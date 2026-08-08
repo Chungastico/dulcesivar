@@ -23,6 +23,13 @@ export const publicEnv = {
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   ),
+  // Sin "required": en local no siempre está configurado, y el sitio debe
+  // seguir funcionando (solo el link de WhatsApp queda relativo hasta que se
+  // fije el dominio real de producción).
+  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.dulcesivar.com").replace(
+    /\/$/,
+    "",
+  ),
 };
 
 /**

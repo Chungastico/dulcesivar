@@ -82,10 +82,26 @@ export type ContentPreset = {
   updated_at: string;
 };
 
+/**
+ * Variante de un insumo: el color de una taza, por ejemplo. Cuelga del
+ * insumo, no lo reemplaza — la mayoría de insumos no tiene ninguna.
+ */
+export type ContentPresetVariant = {
+  id: string;
+  preset_id: string;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Una compra de insumo. El unitario lo calcula la base. */
 export type InventoryPurchase = {
   id: string;
   item_id: string;
+  /** Color/variante comprado, si el insumo los tiene. Null si no aplica. */
+  variant_id: string | null;
   quantity: number;
   total_cost: number;
   unit_cost: number | null;
@@ -96,12 +112,28 @@ export type InventoryPurchase = {
   created_at: string;
 };
 
-/** Vista: costo promedio ponderado por insumo. */
+/** Vista: costo promedio ponderado por insumo (combina todos sus colores). */
 export type InventoryStatus = {
   id: string;
   label: string;
   category: string;
   unit: string;
+  is_active: boolean;
+  total_quantity: number;
+  total_invested: number;
+  avg_unit_cost: number | null;
+  purchase_count: number;
+  last_purchase_at: string | null;
+};
+
+/** Vista: costo y stock de un color específico de un insumo. */
+export type InventoryVariantStatus = {
+  id: string;
+  preset_id: string;
+  item_label: string;
+  unit: string;
+  variant_name: string;
+  sort_order: number;
   is_active: boolean;
   total_quantity: number;
   total_invested: number;
@@ -168,6 +200,18 @@ export type Database = {
     Tables: {
       attribute_groups: Table<AttributeGroup>;
       content_presets: Table<ContentPreset>;
+      content_preset_variants: Table<
+        ContentPresetVariant,
+        [
+          {
+            foreignKeyName: "content_preset_variants_preset_id_fkey";
+            columns: ["preset_id"];
+            isOneToOne: false;
+            referencedRelation: "content_presets";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
       inventory_purchases: Table<
         InventoryPurchase,
         [
@@ -176,6 +220,13 @@ export type Database = {
             columns: ["item_id"];
             isOneToOne: false;
             referencedRelation: "content_presets";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inventory_purchases_variant_id_fkey";
+            columns: ["variant_id"];
+            isOneToOne: false;
+            referencedRelation: "content_preset_variants";
             referencedColumns: ["id"];
           },
         ],
@@ -216,6 +267,10 @@ export type Database = {
     };
     Views: {
       inventory_status: { Row: InventoryStatus; Relationships: [] };
+      inventory_variant_status: {
+        Row: InventoryVariantStatus;
+        Relationships: [];
+      };
       product_costs: { Row: ProductCost; Relationships: [] };
     };
     Functions: Record<string, never>;

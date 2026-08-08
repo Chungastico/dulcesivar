@@ -19,6 +19,13 @@ function normalize(text: string) {
     .toLowerCase();
 }
 
+export type BulkVariant = { id: string; name: string; totalQuantity: number };
+
+/** Clave de fila: un insumo sin color, o un color específico de un insumo. */
+function rowKey(itemId: string, variantId: string | null) {
+  return `${itemId}::${variantId ?? ""}`;
+}
+
 /**
  * Tabla para registrar stock de muchos insumos a la vez.
  *
@@ -29,8 +36,18 @@ function normalize(text: string) {
  * Solo cuentan las filas con cantidad Y costo: una fila con cantidad pero sin
  * costo se ignora en vez de guardarse en $0, que arrastraría el promedio
  * ponderado de ese insumo hacia abajo y mentiría en el margen de cada regalo.
+ *
+ * Un insumo con colores (una taza, un termo…) se expande en una fila por
+ * color en vez de una sola: el stock se guarda por color, que es como ella
+ * realmente lo tiene separado.
  */
-export function BulkStockTable({ items }: { items: InventoryStatus[] }) {
+export function BulkStockTable({
+  items,
+  variantsByItem,
+}: {
+  items: InventoryStatus[];
+  variantsByItem: Map<string, BulkVariant[]>;
+}) {
   const router = useRouter();
 
   const [quantities, setQuantities] = useState<Record<string, string>>({});
@@ -52,26 +69,33 @@ export function BulkStockTable({ items }: { items: InventoryStatus[] }) {
     const q = normalize(query.trim());
     const map = new Map<string, InventoryStatus[]>();
     for (const item of items) {
-      if (q && !normalize(item.label).includes(q)) continue;
+      const variants = variantsByItem.get(item.id) ?? [];
+      const matchesItem = !q || normalize(item.label).includes(q);
+      const matchesVariant = variants.some((v) => normalize(v.name).includes(q));
+      if (q && !matchesItem && !matchesVariant) continue;
       const list = map.get(item.category) ?? [];
       list.push(item);
       map.set(item.category, list);
     }
     return [...map.entries()];
-  }, [items, query]);
+  }, [items, query, variantsByItem]);
 
   const filledCount = Object.keys(quantities).filter(
-    (id) => quantities[id]?.trim() && costs[id]?.trim(),
+    (key) => quantities[key]?.trim() && costs[key]?.trim(),
   ).length;
 
   async function handleSubmit() {
     const rows: BulkRow[] = Object.keys(quantities)
-      .filter((id) => quantities[id]?.trim())
-      .map((id) => ({
-        itemId: id,
-        quantity: quantities[id],
-        totalCost: costs[id] ?? "",
-      }));
+      .filter((key) => quantities[key]?.trim())
+      .map((key) => {
+        const [itemId, variantId] = key.split("::");
+        return {
+          itemId,
+          variantId: variantId || null,
+          quantity: quantities[key],
+          totalCost: costs[key] ?? "",
+        };
+      });
 
     if (rows.length === 0) {
       setResult({ error: "Escribe cantidad y costo en al menos un insumo." });
@@ -162,7 +186,7 @@ export function BulkStockTable({ items }: { items: InventoryStatus[] }) {
 
       <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-raised/95 px-4 py-3 backdrop-blur">
         <span className="text-base text-ink-muted">
-          {filledCount} insumo{filledCount === 1 ? "" : "s"} listo
+          {filledCount} fila{filledCount === 1 ? "" : "s"} lista
           {filledCount === 1 ? "" : "s"} para guardar
         </span>
         <button
@@ -199,66 +223,44 @@ export function BulkStockTable({ items }: { items: InventoryStatus[] }) {
                 </td>
               </tr>
               {list.map((item) => {
-                const qty = quantities[item.id] ?? "";
-                const cost = costs[item.id] ?? "";
-                const q = Number(qty);
-                const c = Number(cost);
-                const unit = qty && cost && q > 0 ? c / q : null;
+                const variants = variantsByItem.get(item.id) ?? [];
+
+                // Insumo con colores: una fila por color, no una fila del
+                // insumo entero — el stock se guarda separado por color.
+                if (variants.length > 0) {
+                  return (
+                    <Row
+                      key={item.id}
+                      groupLabel={`${item.label} (${item.unit})`}
+                      sub
+                      rows={variants.map((v) => ({
+                        key: rowKey(item.id, v.id),
+                        label: v.name,
+                        existing: v.totalQuantity,
+                      }))}
+                      quantities={quantities}
+                      costs={costs}
+                      setQuantities={setQuantities}
+                      setCosts={setCosts}
+                    />
+                  );
+                }
 
                 return (
-                  <tr key={item.id} className="border-b border-line-soft">
-                    <td className="py-1.5 pl-4 pr-3 text-ink">
-                      {item.label}
-                      <span className="ml-1 text-sm text-ink-muted">
-                        ({item.unit})
-                      </span>
-                    </td>
-                    <td className="py-1.5 pr-3 text-right text-sm text-ink-muted">
-                      {Number(item.total_quantity) > 0
-                        ? Number(item.total_quantity)
-                        : "—"}
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.001"
-                        inputMode="decimal"
-                        value={qty}
-                        onChange={(e) =>
-                          setQuantities((prev) => ({
-                            ...prev,
-                            [item.id]: e.target.value,
-                          }))
-                        }
-                        aria-label={`Cantidad de ${item.label}`}
-                        className={cellInput}
-                      />
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      <div className="flex items-center gap-1">
-                        <span className="text-ink-muted">$</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          inputMode="decimal"
-                          value={cost}
-                          onChange={(e) =>
-                            setCosts((prev) => ({
-                              ...prev,
-                              [item.id]: e.target.value,
-                            }))
-                          }
-                          aria-label={`Costo total de ${item.label}`}
-                          className={cellInput}
-                        />
-                      </div>
-                    </td>
-                    <td className="py-1.5 pr-4 text-right text-sm text-ink-muted">
-                      {unit != null ? `$${unit.toFixed(3)}` : "—"}
-                    </td>
-                  </tr>
+                  <Row
+                    key={item.id}
+                    rows={[
+                      {
+                        key: rowKey(item.id, null),
+                        label: `${item.label} (${item.unit})`,
+                        existing: Number(item.total_quantity) || 0,
+                      },
+                    ]}
+                    quantities={quantities}
+                    costs={costs}
+                    setQuantities={setQuantities}
+                    setCosts={setCosts}
+                  />
                 );
               })}
             </tbody>
@@ -272,6 +274,89 @@ export function BulkStockTable({ items }: { items: InventoryStatus[] }) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+function Row({
+  groupLabel,
+  sub = false,
+  rows,
+  quantities,
+  costs,
+  setQuantities,
+  setCosts,
+}: {
+  groupLabel?: string;
+  sub?: boolean;
+  rows: { key: string; label: string; existing: number }[];
+  quantities: Record<string, string>;
+  costs: Record<string, string>;
+  setQuantities: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setCosts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <>
+      {groupLabel ? (
+        <tr>
+          <td colSpan={5} className="py-1 pl-4 pr-3 text-sm font-medium text-ink">
+            {groupLabel}
+          </td>
+        </tr>
+      ) : null}
+      {rows.map((row) => {
+        const qty = quantities[row.key] ?? "";
+        const cost = costs[row.key] ?? "";
+        const q = Number(qty);
+        const c = Number(cost);
+        const unit = qty && cost && q > 0 ? c / q : null;
+
+        return (
+          <tr key={row.key} className="border-b border-line-soft">
+            <td className={`py-1.5 pr-3 text-ink ${sub ? "pl-8 text-sm" : "pl-4"}`}>
+              {sub ? "↳ " : ""}
+              {row.label}
+            </td>
+            <td className="py-1.5 pr-3 text-right text-sm text-ink-muted">
+              {row.existing > 0 ? row.existing : "—"}
+            </td>
+            <td className="py-1.5 pr-3">
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                inputMode="decimal"
+                value={qty}
+                onChange={(e) =>
+                  setQuantities((prev) => ({ ...prev, [row.key]: e.target.value }))
+                }
+                aria-label={`Cantidad de ${row.label}`}
+                className={cellInput}
+              />
+            </td>
+            <td className="py-1.5 pr-3">
+              <div className="flex items-center gap-1">
+                <span className="text-ink-muted">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={cost}
+                  onChange={(e) =>
+                    setCosts((prev) => ({ ...prev, [row.key]: e.target.value }))
+                  }
+                  aria-label={`Costo total de ${row.label}`}
+                  className={cellInput}
+                />
+              </div>
+            </td>
+            <td className="py-1.5 pr-4 text-right text-sm text-ink-muted">
+              {unit != null ? `$${unit.toFixed(3)}` : "—"}
+            </td>
+          </tr>
+        );
+      })}
+    </>
   );
 }
 
