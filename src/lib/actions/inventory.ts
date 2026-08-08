@@ -130,7 +130,52 @@ export async function createVariant(
   }
 
   revalidatePath("/admin/inventario");
-  return { ok: `Color «${trimmed}» agregado.`, id: data.id };
+  revalidatePath("/admin/inventario/carga-inicial");
+  return { ok: `Color "${trimmed}" agregado.`, id: data.id };
+}
+
+/** Renombra un color/variante existente de un insumo. */
+export async function renameVariant(
+  variantId: string,
+  name: string,
+): Promise<ActionState> {
+  await requireAdmin();
+  const trimmed = name.trim();
+  if (trimmed.length < 1) return { error: "El nombre no puede quedar vacío." };
+
+  const { error } = await supabaseAdmin()
+    .from("content_preset_variants")
+    .update({ name: trimmed })
+    .eq("id", variantId);
+
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? "Ya existe otro color con ese nombre en este insumo."
+          : error.message,
+    };
+  }
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/inventario/carga-inicial");
+  return { ok: `Color renombrado a "${trimmed}".` };
+}
+
+/** Elimina un color/variante de un insumo. */
+export async function deleteVariant(variantId: string): Promise<ActionState> {
+  await requireAdmin();
+
+  const { error } = await supabaseAdmin()
+    .from("content_preset_variants")
+    .delete()
+    .eq("id", variantId);
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/admin/inventario");
+  revalidatePath("/admin/inventario/carga-inicial");
+  return { ok: "Color eliminado." };
 }
 
 // ---------------------------------------------------------------------------

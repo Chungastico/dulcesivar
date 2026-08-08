@@ -3,7 +3,12 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { Modal } from "@/components/admin/modal";
-import { createVariant, setHasVariants } from "@/lib/actions/inventory";
+import {
+  createVariant,
+  deleteVariant,
+  renameVariant,
+  setHasVariants,
+} from "@/lib/actions/inventory";
 import type { InventoryStatus, InventoryVariantStatus } from "@/lib/supabase/types";
 
 const money = (n: number) =>
@@ -20,8 +25,7 @@ function normalize(text: string) {
  * Lista de insumos con búsqueda, categorías plegables y modal de gestión.
  *
  * Cada fila es clickeable: abre un modal donde se puede marcar si el insumo
- * tiene colores y agregar/ver los nombres de esos colores. Así se preparan
- * los insumos antes de hacer una carga masiva de stock.
+ * tiene colores y agregar, editar o eliminar los nombres de esos colores.
  */
 export function InventoryBrowser({
   items,
@@ -205,7 +209,7 @@ function ItemRows({
         onClick={onEdit}
         title="Toca para configurar colores"
       >
-        <td className="py-2 pl-4 pr-3 text-ink font-medium">
+        <td className="py-2 pl-4 pr-3 font-medium text-ink">
           {item.label}
         </td>
         <td className="py-2 pr-3 text-center">
@@ -264,7 +268,7 @@ function ItemRows({
 }
 
 /* =========================================================================
-   Modal de gestión de insumo: colores y has_variants
+   Modal de gestión de insumo: colores, renombrar, eliminar y has_variants
    ========================================================================= */
 
 function ItemEditModal({
@@ -279,21 +283,33 @@ function ItemEditModal({
   const [hasVariants, setHasVariantsLocal] = useState(item.has_variants);
   const [toggling, startToggle] = useTransition();
 
-  // Colores creados en esta sesión (antes de que el server refresque)
-  const [justAdded, setJustAdded] = useState<
-    { id: string; name: string }[]
-  >([]);
-
-  const allColors = [
-    ...variants.map((v) => ({ id: v.id, name: v.variant_name })),
-    ...justAdded,
-  ];
+  // Estado único y unificado de colores para evitar duplicados
+  const [colors, setColors] = useState<{ id: string; name: string }[]>(() =>
+    variants.map((v) => ({ id: v.id, name: v.variant_name })),
+  );
 
   function handleToggleVariants(checked: boolean) {
     setHasVariantsLocal(checked);
     startToggle(async () => {
       await setHasVariants(item.id, checked);
     });
+  }
+
+  function handleColorCreated(newColor: { id: string; name: string }) {
+    setColors((prev) => {
+      if (prev.some((c) => c.id === newColor.id)) return prev;
+      return [...prev, newColor];
+    });
+  }
+
+  function handleColorRenamed(id: string, newName: string) {
+    setColors((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name: newName } : c)),
+    );
+  }
+
+  function handleColorDeleted(id: string) {
+    setColors((prev) => prev.filter((c) => c.id !== id));
   }
 
   return (
@@ -329,21 +345,26 @@ function ItemEditModal({
         {/* Lista de colores y agregar nuevos */}
         {hasVariants ? (
           <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-semibold text-ink">
-              Colores / variantes
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-ink">
+                Colores / variantes ({colors.length})
+              </h3>
+              <span className="text-xs text-ink-muted">
+                Toca un nombre para editarlo o la ✕ para borrarlo
+              </span>
+            </div>
 
-            {allColors.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {allColors.map((c) => (
-                  <span
+            {colors.length > 0 ? (
+              <ul className="flex flex-wrap gap-2">
+                {colors.map((c) => (
+                  <ColorChip
                     key={c.id}
-                    className="rounded-full bg-brand-cream/60 px-3 py-1 text-sm text-ink"
-                  >
-                    {c.name}
-                  </span>
+                    color={c}
+                    onRenamed={(newName) => handleColorRenamed(c.id, newName)}
+                    onDeleted={() => handleColorDeleted(c.id)}
+                  />
                 ))}
-              </div>
+              </ul>
             ) : (
               <p className="text-sm text-ink-muted">
                 Aún no hay colores. Agrega los que existen abajo.
@@ -352,9 +373,7 @@ function ItemEditModal({
 
             <AddColorForm
               itemId={item.id}
-              onCreated={(color) =>
-                setJustAdded((prev) => [...prev, color])
-              }
+              onCreated={handleColorCreated}
             />
           </div>
         ) : null}
@@ -386,6 +405,105 @@ function ItemEditModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Chip de color con edición en línea y botón para borrar */
+function ColorChip({
+  color,
+  onRenamed,
+  onDeleted,
+}: {
+  color: { id: string; name: string };
+  onRenamed: (name: string) => void;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(color.name);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function saveRename() {
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === color.name) {
+      setDraft(color.name);
+      setEditing(false);
+      return;
+    }
+
+    startTransition(async () => {
+      setError(null);
+      const res = await renameVariant(color.id, trimmed);
+      if (res.error) {
+        setError(res.error);
+        setDraft(color.name);
+      } else {
+        onRenamed(trimmed);
+      }
+      setEditing(false);
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      setError(null);
+      const res = await deleteVariant(color.id);
+      if (res.error) {
+        setError(res.error);
+      } else {
+        onDeleted();
+      }
+    });
+  }
+
+  if (editing) {
+    return (
+      <li className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          value={draft}
+          disabled={pending}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={saveRename}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveRename();
+            if (e.key === "Escape") {
+              setDraft(color.name);
+              setEditing(false);
+            }
+          }}
+          className="rounded-full border-2 border-brand-teal bg-surface px-3 py-1 text-sm text-ink focus:outline-none"
+        />
+        {error ? <span className="text-xs text-red-700">{error}</span> : null}
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={`inline-flex items-center gap-1.5 rounded-full border border-brand-teal/40 bg-brand-cream/60 py-1 pl-3 pr-2 text-sm text-ink transition hover:bg-brand-cream ${
+        pending ? "opacity-50" : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Clic para renombrar"
+        className="text-left font-medium hover:text-brand-green"
+      >
+        {color.name}
+      </button>
+
+      <button
+        type="button"
+        disabled={pending}
+        onClick={handleDelete}
+        title="Eliminar este color"
+        className="rounded-full p-0.5 text-xs text-ink-muted transition hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+      >
+        ✕
+      </button>
+    </li>
   );
 }
 
