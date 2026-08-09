@@ -89,18 +89,6 @@ const MATERIALS = [
     ],
   },
   {
-    Icon: Coffee,
-    name: "Cerámica y vasos",
-    result: "Nombre, fecha o frase corta, para uso diario.",
-    items: [
-      "Taza cerámica blanca",
-      "Taza con agarradero de corazón",
-      "Vaso 30 onz",
-      "Vaso skinny 600 ml",
-      "Vaso doble pared 30 onz",
-    ],
-  },
-  {
     Icon: ScanLine,
     name: "Cuerina y libretas",
     result: "Ideal para el logo de una empresa.",
@@ -329,7 +317,7 @@ export default async function GrabadoLaserPage() {
           ver el nombre. Esto es lo que manejamos:
         </p>
 
-        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
           {MATERIALS.map(({ Icon, name, result, items }) => (
             <section
               key={name}

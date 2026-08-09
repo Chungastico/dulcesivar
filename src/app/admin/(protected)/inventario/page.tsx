@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { CostMarginTable } from "@/components/admin/cost-margin-table";
 import { InventoryActions } from "@/components/admin/inventory-actions";
 import { InventoryBrowser } from "@/components/admin/inventory-browser";
 import { requireAdmin } from "@/lib/auth";
@@ -139,7 +140,8 @@ export default async function InventarioPage() {
           </h2>
           <p className="mt-0.5 text-sm text-ink-muted">
             «Cubierto» dice qué tan completa está la cuenta: un margen calculado
-            sobre 2 de 7 ítems todavía no es confiable.
+            sobre 2 de 7 ítems todavía no es confiable. Clic en un regalo para
+            editarlo; clic en un encabezado para ordenar por esa columna.
           </p>
         </div>
 
@@ -148,62 +150,7 @@ export default async function InventarioPage() {
             Aún no hay productos en el catálogo.
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-left text-base">
-              <thead>
-                <tr className="border-b-2 border-line text-sm text-ink-muted">
-                  <th className="py-2 pr-3 font-medium">Regalo</th>
-                  <th className="py-2 pr-3 text-right font-medium">Precio</th>
-                  <th className="py-2 pr-3 text-right font-medium">Costo</th>
-                  <th className="py-2 pr-3 text-right font-medium">Margen</th>
-                  <th className="py-2 text-right font-medium">Cubierto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {costs.map((c) => {
-                  const completo =
-                    c.total_items > 0 && c.costed_items === c.total_items;
-                  return (
-                    <tr key={c.product_id} className="border-b border-line-soft">
-                      <td className="py-2 pr-3 text-ink">{c.name}</td>
-                      <td className="py-2 pr-3 text-right text-ink-muted">
-                        {c.price_usd != null ? money(Number(c.price_usd)) : "—"}
-                      </td>
-                      <td className="py-2 pr-3 text-right text-ink-muted">
-                        {c.costed_items > 0
-                          ? money(Number(c.estimated_cost))
-                          : "—"}
-                      </td>
-                      <td
-                        className={`py-2 pr-3 text-right font-medium ${
-                          c.costed_items === 0
-                            ? "text-ink-muted"
-                            : Number(c.estimated_margin) < 0
-                              ? "text-red-700"
-                              : "text-brand-green"
-                        }`}
-                      >
-                        {c.costed_items > 0 && c.estimated_margin != null
-                          ? money(Number(c.estimated_margin))
-                          : "—"}
-                      </td>
-                      <td className="py-2 text-right">
-                        <span
-                          className={`rounded px-2 py-0.5 text-sm font-medium ${
-                            completo
-                              ? "bg-brand-teal/20 text-brand-green"
-                              : "bg-brand-cream text-ink-muted"
-                          }`}
-                        >
-                          {c.costed_items} de {c.total_items}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <CostMarginTable costs={costs} />
         )}
       </section>
     </div>

@@ -87,6 +87,9 @@ export default async function EditProductPage({
           price_usd: product.price_usd != null ? String(product.price_usd) : "",
           is_active: product.is_active,
           is_featured: product.is_featured,
+          has_laser_engraving: product.has_laser_engraving,
+          labor_size: product.labor_size,
+          decor_materials_cost: String(product.decor_materials_cost ?? 0),
           valueIds: product.product_attributes.map((a) => a.value_id),
           contents,
         }}

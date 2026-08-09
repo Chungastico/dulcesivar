@@ -46,6 +46,12 @@ export type Product = {
   price_usd: number | null;
   is_active: boolean;
   is_featured: boolean;
+  /** Categorías internas: no se muestran en el catálogo público, solo sirven
+   *  para calcular el costo real del regalo. */
+  has_laser_engraving: boolean;
+  /** "pequena" = 10% del precio, "grande" = 15%. Ver product_costs. */
+  labor_size: "pequena" | "grande";
+  decor_materials_cost: number;
   created_at: string;
   updated_at: string;
 };
@@ -148,13 +154,17 @@ export type InventoryVariantStatus = {
   last_purchase_at: string | null;
 };
 
-/** Vista: costo estimado y margen por producto. */
+/** Vista: costo estimado y margen por producto, desglosado en sus tres
+ *  fuentes de costo. `estimated_cost` es la suma de las tres. */
 export type ProductCost = {
   product_id: string;
   name: string;
   price_usd: number | null;
   total_items: number;
   costed_items: number;
+  supplies_cost: number;
+  labor_cost: number;
+  decor_cost: number;
   estimated_cost: number;
   estimated_margin: number | null;
 };

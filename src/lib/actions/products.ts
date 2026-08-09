@@ -55,6 +55,14 @@ const productSchema = z.object({
     .max(99999),
   is_active: z.boolean(),
   is_featured: z.boolean(),
+  // Categorías internas: no se muestran en el catálogo público, alimentan el
+  // desglose de costo de Inventario.
+  has_laser_engraving: z.boolean(),
+  labor_size: z.enum(["pequena", "grande"]),
+  decor_materials_cost: z.coerce
+    .number({ message: "El costo de decoración no es válido" })
+    .min(0, "El costo de decoración no puede ser negativo")
+    .max(99999),
   valueIds: z.array(z.string().uuid()),
   // Al menos un ítem: un regalo sin "qué incluye" no le sirve a nadie que lo
   // esté comparando en el catálogo.
@@ -86,6 +94,9 @@ function parseProductForm(formData: FormData) {
     price_usd: String(formData.get("price_usd") ?? "").trim(),
     is_active: formData.get("is_active") === "on",
     is_featured: formData.get("is_featured") === "on",
+    has_laser_engraving: formData.get("has_laser_engraving") === "on",
+    labor_size: String(formData.get("labor_size") ?? "pequena"),
+    decor_materials_cost: String(formData.get("decor_materials_cost") ?? "0").trim(),
     valueIds: formData.getAll("valueIds").map(String),
     contents,
   });
@@ -229,6 +240,9 @@ export async function createProduct(
       price_usd: parsed.data.price_usd,
       is_active: parsed.data.is_active,
       is_featured: parsed.data.is_featured,
+      has_laser_engraving: parsed.data.has_laser_engraving,
+      labor_size: parsed.data.labor_size,
+      decor_materials_cost: parsed.data.decor_materials_cost,
     })
     .select("id")
     .single();
@@ -271,6 +285,9 @@ export async function updateProduct(
       price_usd: parsed.data.price_usd,
       is_active: parsed.data.is_active,
       is_featured: parsed.data.is_featured,
+      has_laser_engraving: parsed.data.has_laser_engraving,
+      labor_size: parsed.data.labor_size,
+      decor_materials_cost: parsed.data.decor_materials_cost,
     })
     .eq("id", productId);
 

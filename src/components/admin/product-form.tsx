@@ -29,6 +29,9 @@ export type ProductFormValues = {
   price_usd: string;
   is_active: boolean;
   is_featured: boolean;
+  has_laser_engraving: boolean;
+  labor_size: "pequena" | "grande";
+  decor_materials_cost: string;
   valueIds: string[];
   contents: ContentItem[];
 };
@@ -40,6 +43,9 @@ const EMPTY: ProductFormValues = {
   price_usd: "",
   is_active: true,
   is_featured: false,
+  has_laser_engraving: false,
+  labor_size: "pequena",
+  decor_materials_cost: "",
   valueIds: [],
   contents: [],
 };
@@ -49,6 +55,7 @@ const STEPS: Step[] = [
   { id: 2, label: "Datos", hint: "Nombre y precio" },
   { id: 3, label: "Qué incluye", hint: "Los ítems de la caja" },
   { id: 4, label: "Etiquetas", hint: "Dónde aparece" },
+  { id: 5, label: "Internas", hint: "Costos que no se publican" },
 ];
 
 export function ProductForm({
@@ -354,6 +361,76 @@ export function ProductForm({
                   files?.[0] && void analyzePhoto(files[0], { force: true }),
               }}
             />
+          </div>
+
+          <div className={step === 5 ? "" : "hidden"}>
+            <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface-raised p-5">
+              <div>
+                <h2 className="text-base font-semibold text-brand-green">
+                  Categorías internas
+                </h2>
+                <p className="mt-0.5 text-sm text-ink-muted">
+                  No se muestran en el catálogo público; sirven para calcular
+                  el costo real en Inventario.
+                </p>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Toggle
+                  name="has_laser_engraving"
+                  defaultChecked={initial.has_laser_engraving}
+                  label="Grabado láser"
+                  hint="Este regalo lleva grabado láser"
+                />
+
+                <Field label="Mano de obra">
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="labor_size"
+                        value="pequena"
+                        defaultChecked={initial.labor_size !== "grande"}
+                        className="size-5 accent-[var(--brand-green)]"
+                      />
+                      <span className="text-base text-ink">
+                        Pequeña (10%)
+                      </span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2">
+                      <input
+                        type="radio"
+                        name="labor_size"
+                        value="grande"
+                        defaultChecked={initial.labor_size === "grande"}
+                        className="size-5 accent-[var(--brand-green)]"
+                      />
+                      <span className="text-base text-ink">Grande (15%)</span>
+                    </label>
+                  </div>
+                </Field>
+              </div>
+
+              <Field
+                label="Costo de materiales de decoración"
+                error={state.fieldErrors?.decor_materials_cost}
+              >
+                <div className="flex max-w-[12rem] items-center gap-2">
+                  <span className="text-lg font-semibold text-ink-muted">
+                    $
+                  </span>
+                  <input
+                    name="decor_materials_cost"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={initial.decor_materials_cost}
+                    placeholder="0.00"
+                    className={inputClass}
+                  />
+                </div>
+              </Field>
+            </section>
           </div>
         </div>
 

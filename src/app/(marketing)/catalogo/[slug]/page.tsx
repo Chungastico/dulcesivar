@@ -193,24 +193,6 @@ export default async function ProductoPage({
             <p className="text-lg text-ink">{product.description}</p>
           ) : null}
 
-          {contents.length ? (
-            <section className="rounded-2xl border border-line bg-surface-raised p-5">
-              <h2 className="text-base font-semibold text-brand-green">
-                Incluye
-              </h2>
-              <ul className="mt-3 flex flex-col gap-1.5">
-                {contents.map((c, i) => (
-                  <li key={i} className="flex gap-2 text-base text-ink">
-                    <span className="font-semibold text-brand-green">
-                      {c.quantity}
-                    </span>
-                    {c.label}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
           <a
             href={whatsappLink(product.name, productUrl)}
             target="_blank"
