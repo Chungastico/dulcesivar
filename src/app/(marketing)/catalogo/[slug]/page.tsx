@@ -1,10 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { PoliciesNote } from "@/components/catalog/policies-note";
 import { ProductCard } from "@/components/catalog/product-card";
+import { ProductGallery } from "@/components/catalog/product-gallery";
 import type { CatalogProduct } from "@/lib/catalog-filters";
 import { publicEnv } from "@/lib/env";
 import { supabasePublic } from "@/lib/supabase/public";
@@ -145,39 +145,11 @@ export default async function ProductoPage({
       </Link>
 
       <div className="mt-4 grid gap-8 lg:grid-cols-2">
-        <div className="flex flex-col gap-3">
-          {images[0] ? (
-            <div className="relative aspect-square overflow-hidden rounded-2xl border border-line bg-brand-cream/40">
-              <Image
-                src={`${base}/${images[0].storage_path}`}
-                alt={product.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 480px"
-                className="object-cover"
-                priority
-              />
-            </div>
-          ) : null}
-
-          {images.length > 1 ? (
-            <ul className="grid grid-cols-4 gap-2">
-              {images.slice(1).map((img) => (
-                <li
-                  key={img.storage_path}
-                  className="relative aspect-square overflow-hidden rounded-lg border border-line bg-brand-cream/40"
-                >
-                  <Image
-                    src={`${base}/${img.storage_path}`}
-                    alt=""
-                    fill
-                    sizes="120px"
-                    className="object-cover"
-                  />
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </div>
+        {images.length ? (
+          <ProductGallery images={images} base={base} alt={product.name} />
+        ) : (
+          <div />
+        )}
 
         <div className="flex flex-col gap-5">
           <div>
