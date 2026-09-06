@@ -260,17 +260,14 @@ export default async function GrabadoLaserPage() {
           </p>
 
           <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.08] text-balance text-white sm:text-5xl lg:text-6xl">
-            {/* Aquí el énfasis va en color y no con el resaltador de lima: el
-                titular es blanco, y blanco sobre lima da 2.32:1. El lima sobre
-                el verde de marca, en cambio, da 5.28:1. */}
-            Grabado <span className="text-brand-lime">láser</span> en El
-            Salvador
+            Tu idea, grabada <span className="text-brand-lime">para siempre</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-brand-cream/90 sm:text-xl">
-            Nombres, fechas, frases y logos grabados sobre acero, madera,
-            vidrio, cerámica y cuerina. Una pieza suelta o un pedido completo
-            para tu empresa, y si quieres lo metemos dentro de un regalo armado.
+            Nombres, fechas, frases y logos grabados directamente sobre
+            acero, madera, vidrio y cuero. Personaliza desde una pieza
+            individual hasta pedidos corporativos. Y si quieres sorprender,
+            la incluimos en un regalo armado especialmente para ti.
           </p>
 
           <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
