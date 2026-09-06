@@ -51,12 +51,12 @@ const PROMISES = [
   {
     Icon: Boxes,
     title: "Se arma a tu medida",
-    text: "Agregas y quitas productos de cualquier caja según lo que quieras dar y lo que tengas para gastar.",
+    text: "¡Tú armas tu Box! Elige tus productos y adáptalo a tu presupuesto.",
   },
   {
     Icon: ScanLine,
-    title: "Grabado láser propio",
-    text: "El nombre, la fecha o la frase van grabados en el vaso, la madera o el acero. No es una calcomanía.",
+    title: "Tu marca, tu estilo",
+    text: "Personaliza tus productos con tu logo, nombre o frase mediante grabado directo sobre madera, acero o vidrio. Un detalle único que hace que tu marca se distinga.",
   },
   {
     Icon: Truck,
