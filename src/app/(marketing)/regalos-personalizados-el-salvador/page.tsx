@@ -15,13 +15,12 @@ import {
 
 import { WhatsAppIcon } from "@/components/icons/social";
 import { CtaBand } from "@/components/site/cta-band";
-import { Arc, Highlight, Sparkle, Squiggle } from "@/components/site/decor";
+import { Arc, Highlight, Squiggle } from "@/components/site/decor";
 import { Faq, faqJsonLd, type FaqItem } from "@/components/site/faq";
 import { JsonLd } from "@/components/site/json-ld";
 import { ProductStrip } from "@/components/site/product-strip";
 import { BUDGET_TIERS } from "@/lib/catalog-filters";
 import {
-  getContentPresets,
   getFeaturedProducts,
   getProductsByAttribute,
   getTaxonomy,
@@ -132,10 +131,8 @@ const FAQS: FaqItem[] = [
 ];
 
 export default async function RegalosPersonalizadosPage() {
-  const [boxTypes, occasions, presets, tagged, featured] = await Promise.all([
-    getTaxonomy("tipo-caja"),
+  const [occasions, tagged, featured] = await Promise.all([
     getTaxonomy("ocasion"),
-    getContentPresets(8),
     getProductsByAttribute("personalizacion", ["total", "parcial"], 8),
     getFeaturedProducts(8),
   ]);
@@ -272,74 +269,6 @@ export default async function RegalosPersonalizadosPage() {
           ))}
         </ul>
       </section>
-
-      {/* ---------------------------------------------------------------- */}
-      {/* Tipos de caja                                                     */}
-      {/* ---------------------------------------------------------------- */}
-      {boxTypes.length > 0 ? (
-        <section className="mx-auto w-full max-w-7xl px-5 py-8 lg:px-8">
-          <div className="rounded-[2rem] bg-brand-cream/50 p-8 sm:p-10">
-            <h2 className="font-display text-3xl font-semibold text-brand-green sm:text-4xl">
-              Tipos de caja
-            </h2>
-            <p className="mt-3 max-w-2xl text-lg text-ink-muted">
-              Cada presentación cambia el tamaño, el empaque y cuántas cosas
-              caben. Todas se personalizan.
-            </p>
-            <ul className="mt-6 flex flex-wrap gap-3">
-              {boxTypes.map((box) => (
-                <li key={box.slug}>
-                  <Link
-                    href={`/catalogo?tipo-caja=${box.slug}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-line bg-surface-raised px-5 py-2.5 text-base font-medium text-ink transition hover:border-brand-green hover:bg-brand-green hover:text-white"
-                  >
-                    {box.name}
-                    <span className="text-sm opacity-60">{box.count}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      ) : null}
-
-      {/* ---------------------------------------------------------------- */}
-      {/* Qué le ponemos adentro (biblioteca real de insumos)               */}
-      {/* ---------------------------------------------------------------- */}
-      {presets.length > 0 ? (
-        <section className="mx-auto w-full max-w-7xl px-5 py-16 lg:px-8">
-          <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-semibold text-brand-green sm:text-4xl">
-              Qué le ponemos adentro
-            </h2>
-            <p className="mt-3 text-lg text-ink-muted">
-              Esto es lo que manejamos. Si buscas algo que no está en la lista,
-              pregúntanos: casi siempre se consigue.
-            </p>
-          </div>
-
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {presets.map((group) => (
-              <section
-                key={group.category}
-                className="rounded-3xl border border-line-soft bg-surface-raised p-7"
-              >
-                <h3 className="flex items-center gap-2 font-display text-xl font-semibold text-brand-green">
-                  <Sparkle className="size-3.5 text-brand-orange" />
-                  {group.category}
-                </h3>
-                <ul className="mt-3 flex flex-col gap-1.5">
-                  {group.items.map((item) => (
-                    <li key={item} className="text-base text-ink-muted">
-                      · {item}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       {/* ---------------------------------------------------------------- */}
       {/* Ejemplos reales                                                   */}
