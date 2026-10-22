@@ -18,7 +18,7 @@ function revalidateAll() {
   revalidatePath("/catalogo");
   // Los grupos/valores de atributos también se usan como filtros del
   // catálogo cacheado (ver src/lib/catalog-data.ts).
-  revalidateTag("catalog");
+  revalidateTag("catalog", "max");
   revalidatePath("/enlaces");
 }
 

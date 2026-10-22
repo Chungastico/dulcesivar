@@ -12,8 +12,10 @@ const BUCKET = "product-images";
 
 /** Invalida el caché del catálogo público (ver src/lib/catalog-data.ts). */
 function revalidateCatalog() {
-  revalidateCatalog();
-  revalidateTag("catalog");
+  revalidatePath("/catalogo");
+  // "max" = purgar ya, no una ventana de cacheLife (el proyecto no usa
+  // Cache Components); revalidateTag en Next 16 exige este segundo argumento.
+  revalidateTag("catalog", "max");
 }
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = [
