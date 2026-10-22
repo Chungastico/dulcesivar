@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth";
@@ -16,6 +16,9 @@ function revalidateAll() {
   revalidatePath("/admin/catalogo");
   revalidatePath("/admin/links");
   revalidatePath("/catalogo");
+  // Los grupos/valores de atributos también se usan como filtros del
+  // catálogo cacheado (ver src/lib/catalog-data.ts).
+  revalidateTag("catalog");
   revalidatePath("/enlaces");
 }
 

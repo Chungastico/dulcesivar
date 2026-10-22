@@ -5,74 +5,19 @@ import type { Metadata } from "next";
 import { PoliciesNote } from "@/components/catalog/policies-note";
 import { ProductCard } from "@/components/catalog/product-card";
 import { ProductGallery } from "@/components/catalog/product-gallery";
-import type { CatalogProduct } from "@/lib/catalog-filters";
+import {
+  getProductBySlug,
+  getProductTags,
+  getRelatedProducts,
+} from "@/lib/catalog-data";
 import { publicEnv } from "@/lib/env";
-import { supabasePublic } from "@/lib/supabase/public";
 import { whatsappLink } from "@/lib/whatsapp";
-
-const SELECT =
-  "*, product_images(storage_path, is_cover, sort_order), product_contents(label, quantity, sort_order), product_attributes(value_id)";
-
-async function getProduct(slug: string) {
-  const { data, error } = await supabasePublic
-    .from("products")
-    .select(SELECT)
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Error cargando el producto:", error);
-    throw new Error("No se pudo cargar el producto.");
-  }
-
-  return data;
-}
-
-/**
- * Otros regalos que comparten al menos una etiqueta con este, ordenados por
- * cuántas comparten. Sin eso, "recomendados" sería solo lo más reciente y no
- * tendría nada que ver con lo que se está viendo.
- */
-async function getRelated(product: NonNullable<Awaited<ReturnType<typeof getProduct>>>) {
-  const valueIds = product.product_attributes.map((a) => a.value_id);
-  if (valueIds.length === 0) return [];
-
-  const { data: sharing } = await supabasePublic
-    .from("product_attributes")
-    .select("product_id")
-    .in("value_id", valueIds)
-    .neq("product_id", product.id);
-
-  const scores = new Map<string, number>();
-  for (const row of sharing ?? []) {
-    scores.set(row.product_id, (scores.get(row.product_id) ?? 0) + 1);
-  }
-  if (scores.size === 0) return [];
-
-  const topIds = [...scores.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([id]) => id);
-
-  const { data: related } = await supabasePublic
-    .from("products")
-    .select(SELECT)
-    .in("id", topIds)
-    .eq("is_active", true);
-
-  // Supabase no promete el orden de un IN(); se reordena según el puntaje ya
-  // calculado para que lo más parecido salga primero.
-  return (related ?? []).sort(
-    (a, b) => (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0),
-  ) as CatalogProduct[];
-}
 
 export async function generateMetadata({
   params,
 }: PageProps<"/catalogo/[slug]">): Promise<Metadata> {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const product = await getProductBySlug(slug);
   if (!product) return { title: "Regalo no encontrado" };
 
   return {
@@ -100,7 +45,7 @@ export default async function ProductoPage({
   params,
 }: PageProps<"/catalogo/[slug]">) {
   const { slug } = await params;
-  const product = await getProduct(slug);
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
   const base = `${publicEnv.supabaseUrl}/storage/v1/object/public/product-images`;
@@ -111,20 +56,11 @@ export default async function ProductoPage({
     (a, b) => a.sort_order - b.sort_order,
   );
 
-  const [tagsResult, related] = await Promise.all([
-    product.product_attributes.length
-      ? supabasePublic
-          .from("attribute_values")
-          .select("id, name, slug, is_active, attribute_groups(slug, show_in_filters)")
-          .in(
-            "id",
-            product.product_attributes.map((a) => a.value_id),
-          )
-          .eq("is_active", true)
-      : Promise.resolve({ data: [] }),
-    getRelated(product),
+  const valueIds = product.product_attributes.map((a) => a.value_id);
+  const [tags, related] = await Promise.all([
+    getProductTags(valueIds),
+    getRelatedProducts(product.id, valueIds),
   ]);
-  const tags = tagsResult.data ?? [];
 
   const productUrl = `${publicEnv.siteUrl}/catalogo/${product.slug}`;
 

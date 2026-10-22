@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -9,6 +9,12 @@ import { slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const BUCKET = "product-images";
+
+/** Invalida el caché del catálogo público (ver src/lib/catalog-data.ts). */
+function revalidateCatalog() {
+  revalidateCatalog();
+  revalidateTag("catalog");
+}
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
@@ -259,7 +265,7 @@ export async function createProduct(
   }
 
   revalidatePath("/admin/catalogo");
-  revalidatePath("/catalogo");
+  revalidateCatalog();
   redirect("/admin/catalogo");
 }
 
@@ -299,7 +305,7 @@ export async function updateProduct(
 
   revalidatePath("/admin/catalogo");
   revalidatePath(`/admin/catalogo/${productId}`);
-  revalidatePath("/catalogo");
+  revalidateCatalog();
   redirect("/admin/catalogo");
 }
 
@@ -322,7 +328,7 @@ export async function deleteProduct(productId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/catalogo");
-  revalidatePath("/catalogo");
+  revalidateCatalog();
   redirect("/admin/catalogo");
 }
 
@@ -358,7 +364,7 @@ export async function deleteProductImage(imageId: string) {
   }
 
   revalidatePath(`/admin/catalogo/${image.product_id}`);
-  revalidatePath("/catalogo");
+  revalidateCatalog();
 }
 
 export async function setCoverImage(imageId: string) {
@@ -383,7 +389,7 @@ export async function setCoverImage(imageId: string) {
   await db.from("product_images").update({ is_cover: true }).eq("id", imageId);
 
   revalidatePath(`/admin/catalogo/${image.product_id}`);
-  revalidatePath("/catalogo");
+  revalidateCatalog();
 }
 
 export async function toggleProductActive(productId: string, isActive: boolean) {
@@ -398,5 +404,5 @@ export async function toggleProductActive(productId: string, isActive: boolean) 
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/catalogo");
-  revalidatePath("/catalogo");
+  revalidateCatalog();
 }

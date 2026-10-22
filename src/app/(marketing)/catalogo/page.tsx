@@ -9,11 +9,9 @@ import {
   BUDGET_PARAM,
   facetCounts,
   parseFilters,
-  type CatalogProduct,
 } from "@/lib/catalog-filters";
+import { getCatalogData } from "@/lib/catalog-data";
 import { publicEnv } from "@/lib/env";
-import { supabasePublic } from "@/lib/supabase/public";
-import type { AttributeGroupWithValues } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
   title: "Catálogo",
@@ -26,31 +24,7 @@ export default async function CatalogoPage({
 }: PageProps<"/catalogo">) {
   const params = await searchParams;
 
-  const [groupsResult, productsResult] = await Promise.all([
-    supabasePublic
-      .from("attribute_groups")
-      .select("*, attribute_values(*)")
-      .eq("is_active", true)
-      .eq("show_in_filters", true)
-      .order("sort_order"),
-    supabasePublic
-      .from("products")
-      .select(
-        "*, product_images(storage_path, is_cover, sort_order), product_contents(label, quantity, sort_order), product_attributes(value_id)",
-      )
-      .eq("is_active", true),
-  ]);
-
-  if (groupsResult.error || productsResult.error) {
-    console.error(
-      "Error cargando el catálogo:",
-      groupsResult.error ?? productsResult.error,
-    );
-    throw new Error("No se pudo cargar el catálogo.");
-  }
-
-  const rawGroups = (groupsResult.data ?? []) as AttributeGroupWithValues[];
-  const products = (productsResult.data ?? []) as CatalogProduct[];
+  const { groups: rawGroups, products } = await getCatalogData();
 
   // El presupuesto ahora se calcula automáticamente a partir de product.price_usd.
   // Si en la base de datos aún existe una categoría manual llamada "Presupuesto",
