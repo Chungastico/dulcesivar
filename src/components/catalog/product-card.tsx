@@ -26,7 +26,6 @@ export function ProductCard({
               src={`${publicUrlBase}/${cover.storage_path}`}
               alt={product.name}
               fill
-              unoptimized
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
               className="object-cover transition group-hover:scale-[1.02]"
             />

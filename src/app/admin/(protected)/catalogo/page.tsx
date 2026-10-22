@@ -56,7 +56,6 @@ export default async function AdminProductsPage() {
                       src={`${publicUrlBase}/${cover.storage_path}`}
                       alt=""
                       fill
-                      unoptimized
                       sizes="48px"
                       className="object-cover"
                     />

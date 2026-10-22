@@ -61,7 +61,6 @@ export function ProductGallery({
           src={`${base}/${active.storage_path}`}
           alt={alt}
           fill
-          unoptimized
           sizes="(max-width: 1024px) 100vw, 480px"
           className="object-cover"
           priority
@@ -91,7 +90,6 @@ export function ProductGallery({
                   src={`${base}/${img.storage_path}`}
                   alt=""
                   fill
-                  unoptimized
                   sizes="120px"
                   className="object-cover"
                 />
@@ -178,7 +176,6 @@ export function ProductGallery({
                     src={`${base}/${img.storage_path}`}
                     alt=""
                     fill
-                    unoptimized
                     sizes="56px"
                     className="object-cover"
                   />
