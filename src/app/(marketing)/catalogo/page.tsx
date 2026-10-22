@@ -41,6 +41,14 @@ export default async function CatalogoPage({
       .eq("is_active", true),
   ]);
 
+  if (groupsResult.error || productsResult.error) {
+    console.error(
+      "Error cargando el catálogo:",
+      groupsResult.error ?? productsResult.error,
+    );
+    throw new Error("No se pudo cargar el catálogo.");
+  }
+
   const rawGroups = (groupsResult.data ?? []) as AttributeGroupWithValues[];
   const products = (productsResult.data ?? []) as CatalogProduct[];
 

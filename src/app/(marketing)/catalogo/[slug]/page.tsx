@@ -14,12 +14,18 @@ const SELECT =
   "*, product_images(storage_path, is_cover, sort_order), product_contents(label, quantity, sort_order), product_attributes(value_id)";
 
 async function getProduct(slug: string) {
-  const { data } = await supabasePublic
+  const { data, error } = await supabasePublic
     .from("products")
     .select(SELECT)
     .eq("slug", slug)
     .eq("is_active", true)
     .maybeSingle();
+
+  if (error) {
+    console.error("Error cargando el producto:", error);
+    throw new Error("No se pudo cargar el producto.");
+  }
+
   return data;
 }
 
