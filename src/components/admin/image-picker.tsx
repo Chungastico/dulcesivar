@@ -72,8 +72,8 @@ export function ImagePicker({
           </p>
           <p className="mt-1 text-sm text-ink-muted">
             {existingImages > 0
-              ? `Este regalo ya tiene ${existingImages} foto${existingImages === 1 ? "" : "s"}. Las nuevas se agregan.`
-              : "La primera será la portada del catálogo."}
+              ? `Este regalo ya tiene ${existingImages} foto${existingImages === 1 ? "" : "s"}. Las nuevas se agregan y se optimizan al guardar.`
+              : "La primera será la portada del catálogo. Las fotos se optimizan al guardar."}
           </p>
         </div>
 

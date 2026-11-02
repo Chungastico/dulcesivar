@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { unstable_isUnrecognizedActionError } from "next/navigation";
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -15,7 +16,14 @@ import { TagPicker } from "@/components/admin/tag-picker";
 import { suggestDescription } from "@/lib/actions/describe-image";
 import { suggestTags } from "@/lib/actions/suggest-tags";
 import type { ActionState } from "@/lib/actions/products";
-import { downscaleToDataUrl } from "@/lib/downscale-image";
+import {
+  MAX_IMAGE_BATCH_BYTES,
+  MAX_IMAGE_BYTES,
+} from "@/lib/image-upload-limits";
+import {
+  compressImageForUpload,
+  downscaleToDataUrl,
+} from "@/lib/downscale-image";
 import { slugify } from "@/lib/slug";
 import type {
   AttributeGroupWithValues,
@@ -76,7 +84,78 @@ export function ProductForm({
   /** Fotos ya guardadas, para mostrarlas y gestionarlas en el panel lateral. */
   existingPhotos?: ExistingPhoto[];
 }) {
-  const [state, formAction] = useActionState(action, {});
+  const [preparingImages, setPreparingImages] = useState(false);
+  const [state, formAction] = useActionState(
+    async (
+      previousState: ActionState,
+      formData: FormData,
+    ): Promise<ActionState> => {
+      const images = formData
+        .getAll("images")
+        .filter(
+          (value): value is File => value instanceof File && value.size > 0,
+        );
+
+      const preparedImages: File[] = [];
+      setPreparingImages(true);
+      try {
+        // Procesarlas una por una evita decodificar varias fotos grandes en
+        // memoria al mismo tiempo.
+        for (const image of images) {
+          preparedImages.push(await compressImageForUpload(image));
+        }
+      } catch {
+        setPreparingImages(false);
+        return {
+          error:
+            "No se pudo preparar una de las fotos. Prueba con JPG, PNG, WebP o AVIF.",
+        };
+      }
+      setPreparingImages(false);
+
+      const tooLargeImage = preparedImages.find(
+        (file) => file.size > MAX_IMAGE_BYTES,
+      );
+      if (tooLargeImage) {
+        return {
+          error: `"${tooLargeImage.name}" sigue pesando más de 8 MB. Elige una foto más pequeña.`,
+        };
+      }
+
+      const totalBytes = preparedImages.reduce(
+        (total, file) => total + file.size,
+        0,
+      );
+      if (totalBytes > MAX_IMAGE_BATCH_BYTES) {
+        return {
+          error:
+            "Las fotos aún pesan más de 4 MB en conjunto. Elige menos fotos o reduce su tamaño.",
+        };
+      }
+
+      const preparedFormData = new FormData();
+      formData.forEach((value, key) => {
+        if (key !== "images") preparedFormData.append(key, value);
+      });
+      for (const file of preparedImages) {
+        preparedFormData.append("images", file, file.name);
+      }
+
+      try {
+        return await action(previousState, preparedFormData);
+      } catch (error) {
+        if (unstable_isUnrecognizedActionError(error)) {
+          return {
+            error:
+              "El servidor cambió de versión mientras esta página estaba abierta. Actualízala y vuelve a enviar el producto.",
+            reloadRequired: true,
+          };
+        }
+        throw error;
+      }
+    },
+    {},
+  );
 
   const [step, setStep] = useState(1);
 
@@ -208,9 +287,21 @@ export function ProductForm({
       <StepIndicator steps={STEPS} current={step} onGo={go} />
 
       {state.error ? (
-        <p className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 text-base text-red-800">
-          {state.error}
-        </p>
+        <div
+          role="alert"
+          className="rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 text-base text-red-800"
+        >
+          <p>{state.error}</p>
+          {state.reloadRequired ? (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-2 rounded-lg border border-red-800 px-3 py-1.5 font-medium text-red-900 underline underline-offset-2"
+            >
+              Actualizar página
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {stepError ? (
         <p className="rounded-xl border-2 border-brand-orange bg-brand-orange/10 px-4 py-3 text-base text-ink">
@@ -464,7 +555,7 @@ export function ProductForm({
             ) : null}
 
             {isLast ? (
-              <SubmitButton label={submitLabel} />
+              <SubmitButton label={submitLabel} preparing={preparingImages} />
             ) : (
               <button
                 type="button"
@@ -533,7 +624,13 @@ function Field({
   );
 }
 
-function SubmitButton({ label }: { label: string }) {
+function SubmitButton({
+  label,
+  preparing,
+}: {
+  label: string;
+  preparing: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
     <button
@@ -541,7 +638,7 @@ function SubmitButton({ label }: { label: string }) {
       disabled={pending}
       className="rounded-lg bg-brand-green px-6 py-2.5 text-base font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
     >
-      {pending ? "Guardando…" : label}
+      {pending ? (preparing ? "Preparando fotos…" : "Guardando…") : label}
     </button>
   );
 }

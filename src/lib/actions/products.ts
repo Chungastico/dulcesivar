@@ -5,6 +5,10 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth";
+import {
+  MAX_IMAGE_BATCH_BYTES,
+  MAX_IMAGE_BYTES,
+} from "@/lib/image-upload-limits";
 import { slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
@@ -17,7 +21,6 @@ function revalidateCatalog() {
   // Cache Components); revalidateTag en Next 16 exige este segundo argumento.
   revalidateTag("catalog", "max");
 }
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -29,6 +32,7 @@ const ALLOWED_IMAGE_TYPES = [
 export type ActionState = {
   error?: string;
   fieldErrors?: Record<string, string>;
+  reloadRequired?: boolean;
 };
 
 const contentItemSchema = z.object({
@@ -216,6 +220,14 @@ function duplicateSlugMessage(error: { code?: string; message: string }) {
     : error.message;
 }
 
+function imageBatchError(files: File[]): string | undefined {
+  const totalBytes = files.reduce((total, file) => total + file.size, 0);
+  if (totalBytes > MAX_IMAGE_BATCH_BYTES) {
+    return "Las fotos aún pesan más de 4 MB en conjunto. Elige menos fotos o reduce su tamaño.";
+  }
+  return undefined;
+}
+
 export async function createProduct(
   _prev: ActionState,
   formData: FormData,
@@ -237,6 +249,9 @@ export async function createProduct(
       fieldErrors: { images: "Sube al menos una imagen." },
     };
   }
+
+  const batchError = imageBatchError(files);
+  if (batchError) return { error: batchError };
 
   const db = supabaseAdmin();
   const { data, error } = await db
@@ -283,6 +298,10 @@ export async function updateProduct(
     return { error: "Revisa los campos marcados.", fieldErrors: flattenErrors(parsed.error) };
   }
 
+  const files = formData.getAll("images").filter((f): f is File => f instanceof File);
+  const batchError = imageBatchError(files.filter((file) => file.size > 0));
+  if (batchError) return { error: batchError };
+
   const db = supabaseAdmin();
   const { error } = await db
     .from("products")
@@ -301,7 +320,6 @@ export async function updateProduct(
 
   if (error) return { error: duplicateSlugMessage(error) };
 
-  const files = formData.getAll("images").filter((f): f is File => f instanceof File);
   const relationError = await saveRelations(db, productId, parsed.data, files);
   if (relationError) return { error: relationError };
 

@@ -18,10 +18,14 @@ const nextConfig: NextConfig = {
       : [],
   },
   experimental: {
+    // `proxy.ts` almacena las solicitudes en búfer antes de enviarlas a la
+    // Server Action. Este límite supera el lote permitido por el formulario y
+    // evita truncar el multipart antes de que Next procese las fotos.
+    proxyClientMaxBodySize: "6mb",
     serverActions: {
-      // Las imágenes se suben por Server Action; el default de 1 MB deja fuera
-      // cualquier foto de celular.
-      bodySizeLimit: "12mb",
+      // Las fotos se comprimen en el navegador y el formulario limita el lote
+      // a 4 MB para dejar margen al multipart.
+      bodySizeLimit: "6mb",
     },
   },
 };
